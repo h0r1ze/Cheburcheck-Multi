@@ -56,7 +56,7 @@
 <td valign="top">
 
 ### 🔗 Любые ссылки
-`vless`, `vmess`, `trojan`, `ss`, `hysteria2`, `host:port`, IP, домен, подсеть, ASN. Хост и имя (`#NL-1`) извлекаются автоматически.
+`vless`, `vmess`, `trojan`, `ss`, `hysteria2`, `host:port`, IP, домен, подсеть, ASN. Хост и имя (`#NL-1`) извлекаются автоматически. Серверов — сколько угодно.
 
 </td>
 <td valign="top">
@@ -90,13 +90,13 @@
 |---|---|
 | 🪟 **Windows 10 / 11** | [**Cheburcheck-Multi-Windows-x64.exe**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi-Windows-x64.exe) |
 | 🐧 **Linux** x64 | [**Cheburcheck-Multi-Linux-x64.tar.gz**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi-Linux-x64.tar.gz) |
-| 🐧 **Linux** ARM64 · Raspberry Pi | [**Cheburcheck-Multi-Linux-arm64.tar.gz**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi-Linux-arm64.tar.gz) |
+| 🐧 **Linux** ARM64 · Raspberry Pi (64-битная ОС) | [**Cheburcheck-Multi-Linux-arm64.tar.gz**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi-Linux-arm64.tar.gz) |
 | 🍎 **macOS** Apple Silicon | [**Cheburcheck-Multi-macOS-arm64.tar.gz**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi-macOS-arm64.tar.gz) |
 | 🧩 Любая система с Python 3.8+ | [Cheburcheck-Multi.zip](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi.zip) |
 
 **Windows** — запустите `.exe`. Если появится «Windows защитила ваш компьютер», нажмите **Подробнее → Выполнить в любом случае** (программа не подписана сертификатом).
 
-**Linux:**
+**Linux** (нужна glibc 2.35+: Ubuntu 22.04+, Debian 12+, Fedora 36+ и новее; на более старых — запуск через Python):
 
 ```bash
 tar xzf Cheburcheck-Multi-Linux-*.tar.gz
@@ -107,7 +107,7 @@ tar xzf Cheburcheck-Multi-Linux-*.tar.gz
 
 ```bash
 tar xzf Cheburcheck-Multi-macOS-arm64.tar.gz
-xattr -d com.apple.quarantine cheburcheck-multi
+xattr -c cheburcheck-multi
 ./cheburcheck-multi
 ```
 
@@ -180,6 +180,22 @@ flowchart LR
 - Вердикт по пробам считается по той же логике, что `selectProbeVerdict` в исходниках [cheburcheck](https://github.com/LowderPlay/cheburcheck/blob/master/frontend/src/lib/api/probe.ts).
 
 <details>
+<summary><b>Выпуск новой версии</b></summary>
+
+1. Поменяйте `VERSION` в `cheburcheck.py`, закоммитьте и отправьте изменения.
+2. Поставьте тег — дальше всё сделает GitHub Actions (сборка под все системы, проверка, релиз с файлами и `SHA256SUMS.txt`):
+
+```bash
+git tag -a v1.2.0 -m "Cheburcheck Multi v1.2.0"
+git push origin v1.2.0
+```
+
+Собрать программу вручную: `pip install pyinstaller certifi`, затем
+`pyinstaller --onefile --name cheburcheck-multi --icon docs/icon.ico --add-data "index.html:." cheburcheck.py` — результат в `dist/`.
+
+</details>
+
+<details>
 <summary><b>Структура проекта</b></summary>
 
 | Файл | Назначение |
@@ -188,7 +204,8 @@ flowchart LR
 | `index.html` | интерфейс целиком (HTML + CSS + JS) |
 | `start.bat` / `start.sh` | запуск из исходников на Windows / Linux и macOS |
 | `.github/workflows/release.yml` | сборка программ под Windows, Linux, macOS и публикация релиза |
-| `docs/` | картинки для README |
+| `.github/release-notes.md` | шаблон описания релиза (таблица загрузок, инструкции) |
+| `docs/` | картинки для README и иконка программы |
 | `state.json` | ваши серверы и результаты — создаётся рядом с программой, **в git не попадает** |
 
 </details>
@@ -221,7 +238,14 @@ flowchart LR
 <details>
 <summary><b>Мои ссылки куда-то отправляются?</b></summary>
 
-На cheburcheck.ru уходит **только хост** (IP или домен) — ни UUID, ни пароли, ни параметры из ссылки не передаются. Сами ссылки хранятся только у вас в `state.json` и в памяти браузера.
+На cheburcheck.ru уходит **только хост** (IP или домен) — ни UUID, ни пароли, ни параметры из ссылки не передаются. Сами ссылки хранятся только у вас в `state.json` и в памяти браузера. Сайт, как и при обычном заходе, видит ваш IP-адрес.
+
+</details>
+
+<details>
+<summary><b>Как обновиться, не потеряв список серверов?</b></summary>
+
+Скачайте новую версию и положите её **в ту же папку**, заменив старый файл, — `state.json` рядом останется, и всё подхватится. Можно и наоборот: перенести `state.json` к новой программе. На всякий случай перед обновлением можно нажать «Экспортировать». Текущая версия видна при запуске и по `--version`.
 
 </details>
 
@@ -256,10 +280,10 @@ cheburcheck.ru кеширует результаты проб на 3 часа. �
 <details>
 <summary><b>macOS: «не удаётся проверить разработчика»</b></summary>
 
-Это Gatekeeper блокирует неподписанную программу. Один раз выполните в Терминале в папке с программой:
+Это Gatekeeper блокирует неподписанную программу. Один раз выполните в Терминале в папке с программой (команда снимает метку «скачано из интернета»):
 
 ```bash
-xattr -d com.apple.quarantine cheburcheck-multi
+xattr -c cheburcheck-multi
 ```
 
 Или: правый клик по файлу → **Открыть** → **Открыть**. Для Mac на Intel используйте `Cheburcheck-Multi.zip` и запуск через Python.
