@@ -57,6 +57,49 @@ def state_path():
 
 
 STATE = state_path()
+SETTINGS = os.path.join(os.path.dirname(STATE), "settings.json")   # выбранный порт
+DEFAULT_PORT = 18765
+MIN_PORT = 1024
+# текущий сервер; меняется при смене порта со страницы
+APP = {"httpd": None, "host": "127.0.0.1", "shown_host": "127.0.0.1", "preferred": DEFAULT_PORT,
+       "stop": threading.Event(), "lock": threading.Lock()}
+
+
+def load_settings():
+    try:
+        with open(SETTINGS, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_settings(**values):
+    data = load_settings()
+    data.update(values)
+    try:
+        tmp = SETTINGS + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, SETTINGS)
+    except OSError:
+        pass
+
+
+def app_url(port):
+    return f"http://{APP['shown_host']}:{port}/"
+
+
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+    # На Windows SO_REUSEADDR позволяет занять порт, который уже слушает другая программа, —
+    # «порт занят» тогда не обнаружился бы. Там просим у системы монопольный доступ к порту.
+    allow_reuse_address = not sys.platform.startswith("win")
+
+    def server_bind(self):
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
 
 def ssl_context():
@@ -118,6 +161,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.get_state()
             elif path == "/api/ping":
                 self.send_json(200, {"app": APP_ID, "version": VERSION})
+            elif path == "/api/info":
+                port = self.server.server_address[1]
+                self.send_json(200, {"app": APP_ID, "version": VERSION, "port": port, "url": app_url(port),
+                                     "preferred": APP["preferred"], "default": DEFAULT_PORT, "min": MIN_PORT,
+                                     "state": STATE})
             elif path == "/api/check":
                 target = urllib.parse.parse_qs(url.query).get("target", [""])[0].strip()
                 self.check(target)
@@ -143,8 +191,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/shutdown":
             self.send_json(200, {"ok": True})
             print("Остановлено со страницы.", flush=True)
-            threading.Thread(target=self.server.shutdown, daemon=True).start()
+            APP["stop"].set()
             return
+        if path == "/api/port":
+            return self.change_port()
         if path != "/api/state":
             return self.send_json(404, {"error": "not found"})
         length = int(self.headers.get("Content-Length") or 0)
@@ -161,6 +211,38 @@ class Handler(BaseHTTPRequestHandler):
                 f.write(raw)
             os.replace(tmp, STATE)
         self.send_json(200, {"ok": True})
+
+    def change_port(self):
+        """Переезд на другой порт без перезапуска: поднимаем сервер на новом порту,
+        страница переходит туда сама, старый порт закрываем через несколько секунд."""
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            port = int(json.loads(self.rfile.read(length).decode("utf-8")).get("port")) if 0 < length < 1024 else 0
+        except (ValueError, TypeError, AttributeError):
+            port = 0
+        if not MIN_PORT <= port <= 65535:
+            return self.send_json(400, {"error": f"Порт — число от {MIN_PORT} до 65535"})
+        with APP["lock"]:
+            old = APP["httpd"]
+            if port == old.server_address[1]:
+                APP["preferred"] = port
+                save_settings(port=port)
+                return self.send_json(200, {"url": app_url(port), "port": port, "moved": False})
+            try:
+                new = Server((APP["host"], port), Handler)
+            except OSError:
+                return self.send_json(409, {"error": f"Порт {port} занят другой программой — выберите другой"})
+            APP["httpd"], APP["preferred"] = new, port
+            threading.Thread(target=new.serve_forever, daemon=True).start()
+        save_settings(port=port)
+        print(f"Порт изменён: теперь {app_url(port)}", flush=True)
+        self.send_json(200, {"url": app_url(port), "port": port, "moved": True})
+
+        def retire():
+            time.sleep(5)               # дать странице перейти на новый адрес
+            old.shutdown()
+            old.server_close()
+        threading.Thread(target=retire, daemon=True).start()
 
     def get_state(self):
         with state_lock:
@@ -371,16 +453,21 @@ def main():
     ap = argparse.ArgumentParser(description="Cheburcheck Multi — пакетная проверка адресов")
     ap.add_argument("--version", action="version", version=f"Cheburcheck Multi {VERSION}")
     ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=18765)
+    ap.add_argument("--port", type=int, default=None,
+                    help=f"порт (по умолчанию — выбранный в настройках на странице или {DEFAULT_PORT})")
     ap.add_argument("--no-browser", action="store_true", help="не открывать браузер автоматически")
     ap.add_argument("--verbose", action="store_true", help="логировать запросы")
     ap.add_argument("--no-terminal", action="store_true", help="Linux: не открывать своё окно терминала")
     args = ap.parse_args()
     shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "") else args.host
+    preferred = args.port or load_settings().get("port") or DEFAULT_PORT
+    if not isinstance(preferred, int) or not MIN_PORT <= preferred <= 65535:
+        preferred = DEFAULT_PORT
+    ports = range(preferred, min(preferred + 20, 65536))
 
     if not args.no_terminal and not in_terminal() and sys.platform.startswith("linux"):
         # если уже запущено — просто открыть вкладку, терминал не нужен
-        for port in range(args.port, args.port + 20):
+        for port in ports:
             existing = running_instance(shown_host, port)
             if existing:
                 if not args.no_browser:
@@ -390,11 +477,11 @@ def main():
             # ждём, пока программа поднимется в новом окне; если не вышло — работаем здесь, без окна
             for _ in range(25):
                 time.sleep(0.3)
-                if any(running_instance(shown_host, p) for p in range(args.port, args.port + 20)):
+                if any(running_instance(shown_host, p) for p in ports):
                     return
 
     httpd = None
-    for port in range(args.port, args.port + 20):
+    for port in ports:
         existing = running_instance(shown_host, port)
         if existing:
             print(f"Cheburcheck Multi уже запущен: {existing}", flush=True)
@@ -402,16 +489,18 @@ def main():
                 print("Откройте этот адрес в браузере вручную.", flush=True)
             return
         try:
-            httpd = ThreadingHTTPServer((args.host, port), Handler)
+            httpd = Server((args.host, port), Handler)
             break
         except OSError:
             continue
     if httpd is None:
-        print(f"Не удалось занять порт {args.port}-{args.port + 19}")
+        print(f"Не удалось занять ни один порт из {ports.start}–{ports.stop - 1}. Запустите с --port <другой порт>.")
         sys.exit(1)
-    httpd.daemon_threads = True
+    APP.update(httpd=httpd, host=args.host, shown_host=shown_host, preferred=preferred)
 
-    url = f"http://{shown_host}:{httpd.server_address[1]}/"
+    url = app_url(port)
+    if port != preferred:
+        print(f"Порт {preferred} занят другой программой — работаем на {port}. Поменять: ⚙ на странице.", flush=True)
     print(f"Cheburcheck Multi v{VERSION} запущен: {url}", flush=True)
     print("Остановить: кнопка «Выход» на странице, Ctrl+C или закройте это окно", flush=True)
     print(f"Список серверов хранится в: {STATE}", flush=True)
@@ -421,12 +510,17 @@ def main():
                 print("Не удалось открыть браузер — откройте адрес выше вручную.", flush=True)
         # сервер уже слушает порт, поэтому страница загрузится сразу
         threading.Thread(target=_open, daemon=True).start()
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
     try:
-        httpd.serve_forever()
+        while not APP["stop"].wait(0.5):
+            pass
     except KeyboardInterrupt:
         print("\nОстановлено.")
     finally:
-        httpd.server_close()
+        with APP["lock"]:
+            current = APP["httpd"]
+        current.shutdown()
+        current.server_close()
     if os.environ.get("CHEBURCHECK_IN_TERMINAL"):
         time.sleep(1.5)             # своё окно терминала закроется — дать прочитать последнюю строку
 

@@ -1,6 +1,8 @@
 # личные данные: список серверов и результаты проверок
 state.json
 state.json.tmp
+settings.json
+settings.json.tmp
 cheburcheck-servers-*.json
 
 __pycache__/
