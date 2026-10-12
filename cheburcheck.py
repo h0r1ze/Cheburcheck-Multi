@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import socket
 import ssl
@@ -127,8 +128,24 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
 
+    def origin_ok(self):
+        """POST принимаем только со своей страницы: чужой сайт, открытый в браузере,
+        не должен уметь перезаписать список серверов или выключить программу."""
+        origin = self.headers.get("Origin")
+        if origin is None:          # не из браузера (curl и т.п.)
+            return True
+        return urllib.parse.urlsplit(origin).netloc == self.headers.get("Host", "")
+
     def do_POST(self):
-        if urllib.parse.urlsplit(self.path).path != "/api/state":
+        path = urllib.parse.urlsplit(self.path).path
+        if not self.origin_ok():
+            return self.send_json(403, {"error": "forbidden"})
+        if path == "/api/shutdown":
+            self.send_json(200, {"ok": True})
+            print("Остановлено со страницы.", flush=True)
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+            return
+        if path != "/api/state":
             return self.send_json(404, {"error": "not found"})
         length = int(self.headers.get("Content-Length") or 0)
         if length <= 0 or length > MAX_STATE:
@@ -240,6 +257,23 @@ class Handler(BaseHTTPRequestHandler):
             up.close()
 
 
+def clean_env(extra=None):
+    """Окружение для запуска других программ. Готовая сборка (PyInstaller) подменяет
+    LD_LIBRARY_PATH на свою временную папку и ставит служебные переменные — системный
+    терминал или браузер не должны их унаследовать, а новая копия программы должна
+    стартовать как самостоятельная."""
+    env = dict(os.environ)
+    if FROZEN:
+        orig = env.pop("LD_LIBRARY_PATH_ORIG", None)
+        if orig is not None:
+            env["LD_LIBRARY_PATH"] = orig
+        else:
+            env.pop("LD_LIBRARY_PATH", None)
+        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    env.update(extra or {})
+    return env
+
+
 def open_browser(url):
     """Открывает url в браузере по умолчанию. Возвращает True, если удалось запустить."""
     try:
@@ -247,14 +281,14 @@ def open_browser(url):
             os.startfile(url)
             return True
         if sys.platform == "darwin":
-            subprocess.Popen(["open", url])
+            subprocess.Popen(["open", url], env=clean_env())
             return True
         # Linux: сначала системные «открывалки», они берут браузер по умолчанию из DE
         for cmd in (["xdg-open"], ["gio", "open"], ["sensible-browser"], ["x-www-browser"],
                     ["firefox"], ["chromium"], ["chromium-browser"], ["google-chrome"], ["yandex-browser"]):
             if shutil.which(cmd[0]):
                 subprocess.Popen(cmd + [url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL, start_new_session=True)
+                                 stderr=subprocess.DEVNULL, start_new_session=True, env=clean_env())
                 return True
     except Exception:
         pass
@@ -262,6 +296,56 @@ def open_browser(url):
         return webbrowser.open(url)
     except Exception:
         return False
+
+
+def in_terminal():
+    return any(getattr(f, "isatty", lambda: False)() for f in (sys.stdin, sys.stdout) if f)
+
+
+def relaunch_in_terminal(argv):
+    """Linux: при запуске двойным кликом из файлового менеджера окна терминала нет — сервер
+    работал бы невидимо и его нечем было бы остановить. Перезапускаемся в окне терминала:
+    там видно адрес, а Ctrl+C или закрытие окна останавливают программу."""
+    if not sys.platform.startswith("linux") or in_terminal() or os.environ.get("CHEBURCHECK_IN_TERMINAL"):
+        return False
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        return False
+    cmd = ([sys.executable] if FROZEN else [sys.executable, os.path.abspath(__file__)]) + argv
+    title = "Cheburcheck Multi"
+    terminals = {
+        "x-terminal-emulator": ["-e"] + cmd,           # терминал по умолчанию в Debian/Ubuntu
+        "gnome-terminal": ["--title", title, "--"] + cmd,
+        "konsole": ["-p", f"tabtitle={title}", "-e"] + cmd,
+        "mate-terminal": ["--title", title, "-x"] + cmd,
+        "xfce4-terminal": ["--title", title, "-x"] + cmd,
+        "lxterminal": ["-t", title, "-e", shlex.join(cmd)],
+        "qterminal": ["-e", shlex.join(cmd)],
+        "tilix": ["-t", title, "-e", shlex.join(cmd)],
+        "terminator": ["-T", title, "-x"] + cmd,
+        "kitty": ["--title", title] + cmd,
+        "alacritty": ["--title", title, "-e"] + cmd,
+        "xterm": ["-T", title, "-e"] + cmd,
+    }
+    # сначала терминал «родного» окружения рабочего стола
+    desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").upper()
+    native = [t for key, t in (("KDE", "konsole"), ("GNOME", "gnome-terminal"), ("MATE", "mate-terminal"),
+                               ("XFCE", "xfce4-terminal"), ("LXQT", "qterminal"), ("LXDE", "lxterminal")) if key in desktop]
+    env = clean_env({"CHEBURCHECK_IN_TERMINAL": "1"})
+    for name in native + [t for t in terminals if t not in native]:
+        exe = shutil.which(name)
+        if not exe:
+            continue
+        try:
+            p = subprocess.Popen([exe] + terminals[name], env=env, start_new_session=True,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            p.wait(timeout=1.5)         # gnome-terminal сразу возвращает 0, остальные продолжают работать
+            if p.returncode == 0:
+                return True
+        except subprocess.TimeoutExpired:
+            return True
+        except OSError:
+            continue
+    return False                        # терминала нет — работаем без окна (выключить можно кнопкой «Выход»)
 
 
 def running_instance(host, port):
@@ -290,8 +374,24 @@ def main():
     ap.add_argument("--port", type=int, default=18765)
     ap.add_argument("--no-browser", action="store_true", help="не открывать браузер автоматически")
     ap.add_argument("--verbose", action="store_true", help="логировать запросы")
+    ap.add_argument("--no-terminal", action="store_true", help="Linux: не открывать своё окно терминала")
     args = ap.parse_args()
     shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "") else args.host
+
+    if not args.no_terminal and not in_terminal() and sys.platform.startswith("linux"):
+        # если уже запущено — просто открыть вкладку, терминал не нужен
+        for port in range(args.port, args.port + 20):
+            existing = running_instance(shown_host, port)
+            if existing:
+                if not args.no_browser:
+                    open_browser(existing)
+                return
+        if relaunch_in_terminal(sys.argv[1:]):
+            # ждём, пока программа поднимется в новом окне; если не вышло — работаем здесь, без окна
+            for _ in range(25):
+                time.sleep(0.3)
+                if any(running_instance(shown_host, p) for p in range(args.port, args.port + 20)):
+                    return
 
     httpd = None
     for port in range(args.port, args.port + 20):
@@ -313,7 +413,7 @@ def main():
 
     url = f"http://{shown_host}:{httpd.server_address[1]}/"
     print(f"Cheburcheck Multi v{VERSION} запущен: {url}", flush=True)
-    print("Остановить: Ctrl+C (или закройте это окно)", flush=True)
+    print("Остановить: кнопка «Выход» на странице, Ctrl+C или закройте это окно", flush=True)
     print(f"Список серверов хранится в: {STATE}", flush=True)
     if not args.no_browser:
         def _open():
@@ -327,6 +427,8 @@ def main():
         print("\nОстановлено.")
     finally:
         httpd.server_close()
+    if os.environ.get("CHEBURCHECK_IN_TERMINAL"):
+        time.sleep(1.5)             # своё окно терминала закроется — дать прочитать последнюю строку
 
 
 if __name__ == "__main__":

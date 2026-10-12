@@ -142,6 +142,9 @@ try { window.applyTheme(localStorage.getItem("cheburcheck-theme") || "auto"); } 
            opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; z-index: 20; }
   .toast.show { opacity: 1; transform: none; }
   footer { margin-top: 24px; font-size: 12px; color: var(--muted); }
+  .bye { max-width: 560px; margin: 18vh auto 0; padding: 0 16px; text-align: center; }
+  .bye h1 { margin-bottom: 12px; }
+  .bye p { color: var(--muted); line-height: 1.7; }
 
   /* выбор темы */
   header { position: relative; }
@@ -189,6 +192,8 @@ try { window.applyTheme(localStorage.getItem("cheburcheck-theme") || "auto"); } 
       <span class="sep"></span>
       <button id="checkAll" class="primary">Проверить все</button>
       <button id="stopAll">Стоп</button>
+      <span class="sep"></span>
+      <button class="ghost" id="quitBtn" title="Выключить программу (локальный сервер)">⏻ Выход</button>
     </div>
   </header>
   <div class="descrow">
@@ -930,7 +935,21 @@ addEventListener("beforeunload", () => {
   try { localStorage.setItem("cheburcheck-multi", JSON.stringify(state)); } catch {}
   try { navigator.sendBeacon("/api/state", new Blob([JSON.stringify(state)], { type: "application/json" })); } catch {}
 });
-setInterval(() => { if (!Object.keys(running).length) renderTiles(); }, 30000);  // «N мин назад»
+const relTimer = setInterval(() => { if (!Object.keys(running).length) renderTiles(); }, 30000);  // «N мин назад»
+
+// ---------- выключение программы ----------
+$("#quitBtn").onclick = async () => {
+  if (!confirm("Выключить Cheburcheck Multi?\n\nЛокальный сервер остановится, страница перестанет работать до следующего запуска программы.")) return;
+  queueAbort = true;
+  for (const id of Object.keys(running)) stopCheck(id, true);
+  await save(true);
+  let ok = false;
+  try { ok = (await fetch("/api/shutdown", { method: "POST" })).ok; } catch {}
+  if (!ok) return toast("Не удалось выключить: программа не отвечает");
+  clearInterval(relTimer);
+  document.body.innerHTML = `<div class="bye"><h1>Cheburcheck Multi выключен</h1>
+    <p>Список серверов сохранён. Вкладку можно закрыть.<br>Чтобы продолжить — снова запустите программу.</p></div>`;
+};
 
 load().then(() => { renderTiles(); renderDetail(); });
 </script>
