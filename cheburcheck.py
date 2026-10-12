@@ -30,7 +30,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 APP_ID = "cheburcheck-multi"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 BASE = "https://cheburcheck.ru"
 UA = "Mozilla/5.0 (cheburcheck-multi; +https://cheburcheck.ru)"
 HERE = os.path.dirname(os.path.abspath(__file__))
