@@ -6,12 +6,12 @@
 
 **Проверка всех ваших VPN-серверов на блокировки в России — одним нажатием.**
 
-Вставьте ссылки `vless://` · `vmess://` · `trojan://` · `ss://` · `hysteria2://` — и увидите, какие серверы режет ТСПУ, у каких операторов и в каких регионах.
+Вставьте ссылки `vless://` · `vmess://` · `trojan://` · `ss://` · `hysteria2://` — и увидите, какие серверы режет ТСПУ, у каких операторов и в каких регионах.<br>
+Готовая программа для **Windows**, **Linux** и **macOS** — скачал и запустил.
 
 [![Release](https://img.shields.io/github/v/release/h0r1ze/Cheburcheck-Multi?color=22c55e&label=%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F)](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest)
-[![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![Windows · Linux · macOS](https://img.shields.io/badge/Windows%20%C2%B7%20Linux%20%C2%B7%20macOS-0a0a0a?logo=windowsterminal&logoColor=white)](#-быстрый-старт)
-[![Зависимости: 0](https://img.shields.io/badge/%D0%B7%D0%B0%D0%B2%D0%B8%D1%81%D0%B8%D0%BC%D0%BE%D1%81%D1%82%D0%B8-0-22c55e)](#-как-это-устроено)
+[![Python не нужен](https://img.shields.io/badge/Python-%D0%BD%D0%B5%20%D0%BD%D1%83%D0%B6%D0%B5%D0%BD-3776AB?logo=python&logoColor=white)](#-быстрый-старт)
 [![License: MIT](https://img.shields.io/github/license/h0r1ze/Cheburcheck-Multi?color=f59e0b)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/h0r1ze/Cheburcheck-Multi?style=flat&color=ef4444)](https://github.com/h0r1ze/Cheburcheck-Multi/stargazers)
 
@@ -132,13 +132,14 @@ cd Cheburcheck-Multi
 <summary><b>Параметры запуска</b></summary>
 
 ```bash
-python3 cheburcheck.py --port 18765    # другой порт (если занят — возьмётся следующий свободный)
-python3 cheburcheck.py --no-browser    # не открывать браузер
-python3 cheburcheck.py --host 0.0.0.0  # доступ из локальной сети (осторожно: без пароля)
-python3 cheburcheck.py --verbose       # логировать запросы
-python3 cheburcheck.py --version       # показать версию
-# то же самое работает и с готовой программой: cheburcheck-multi --port 18765 …
+cheburcheck-multi --port 18765    # другой порт (если занят — возьмётся следующий свободный)
+cheburcheck-multi --no-browser    # не открывать браузер
+cheburcheck-multi --host 0.0.0.0  # доступ из локальной сети (осторожно: без пароля)
+cheburcheck-multi --verbose       # логировать запросы
+cheburcheck-multi --version       # показать версию
 ```
+
+На Windows — `Cheburcheck-Multi-Windows-x64.exe --port 18765` и т.д., из исходников — `python3 cheburcheck.py --port 18765`.
 
 </details>
 
@@ -175,6 +176,7 @@ flowchart LR
 
 - Браузер не может ходить в API сайта напрямую (CORS), поэтому `cheburcheck.py` проксирует запросы, выстраивает очередь проб и хранит состояние.
 - Весь интерфейс — один файл `index.html` без сборки и библиотек; сервер — один файл на стандартной библиотеке Python.
+- Готовые программы собираются из этого же кода (PyInstaller) в [GitHub Actions](.github/workflows/release.yml): каждая сборка перед публикацией запускается и проверяется, к релизу прикладываются контрольные суммы `SHA256SUMS.txt`.
 - Вердикт по пробам считается по той же логике, что `selectProbeVerdict` в исходниках [cheburcheck](https://github.com/LowderPlay/cheburcheck/blob/master/frontend/src/lib/api/probe.ts).
 
 <details>
@@ -245,9 +247,36 @@ cheburcheck.ru кеширует результаты проб на 3 часа. �
 </details>
 
 <details>
-<summary><b>Windows пишет «Python не найден»</b></summary>
+<summary><b>Windows пишет «Windows защитила ваш компьютер» / ругается антивирус</b></summary>
 
-Установите Python с [python.org](https://www.python.org/downloads/) и при установке отметьте **«Add python.exe to PATH»**. Затем снова запустите `start.bat`.
+Программа не подписана платным сертификатом разработчика, поэтому SmartScreen её не знает: нажмите **Подробнее → Выполнить в любом случае**. Некоторые антивирусы ложно срабатывают на любые программы, собранные PyInstaller. Можно сверить файл с `SHA256SUMS.txt` из релиза или запускать из исходников через Python — код открыт.
+
+</details>
+
+<details>
+<summary><b>macOS: «не удаётся проверить разработчика»</b></summary>
+
+Это Gatekeeper блокирует неподписанную программу. Один раз выполните в Терминале в папке с программой:
+
+```bash
+xattr -d com.apple.quarantine cheburcheck-multi
+```
+
+Или: правый клик по файлу → **Открыть** → **Открыть**. Для Mac на Intel используйте `Cheburcheck-Multi.zip` и запуск через Python.
+
+</details>
+
+<details>
+<summary><b>Где хранится список серверов?</b></summary>
+
+В `state.json` рядом с программой — его можно копировать или удалять. Если папка недоступна для записи (например, `Program Files`), файл создаётся в профиле пользователя: `%APPDATA%\Cheburcheck-Multi` на Windows, `~/Library/Application Support/Cheburcheck-Multi` на macOS, `~/.config/cheburcheck-multi` на Linux. Точный путь программа пишет при запуске.
+
+</details>
+
+<details>
+<summary><b>Запуск из исходников: «Python не найден»</b></summary>
+
+Установите Python с [python.org](https://www.python.org/downloads/) и при установке отметьте **«Add python.exe to PATH»**. Затем снова запустите `start.bat`. Или просто скачайте готовую программу — для неё Python не нужен.
 
 </details>
 
