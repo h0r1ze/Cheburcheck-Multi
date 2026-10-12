@@ -15,7 +15,7 @@
 [![License: MIT](https://img.shields.io/github/license/h0r1ze/Cheburcheck-Multi?color=f59e0b)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/h0r1ze/Cheburcheck-Multi?style=flat&color=ef4444)](https://github.com/h0r1ze/Cheburcheck-Multi/stargazers)
 
-[**⬇ Скачать**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi.zip) ·
+[**⬇ Скачать**](#-быстрый-старт) ·
 [Быстрый старт](#-быстрый-старт) ·
 [Как читать результат](#-как-читать-результат) ·
 [Темы](#-10-тем-оформления) ·
@@ -84,13 +84,39 @@
 
 ## 🚀 Быстрый старт
 
-### 🪟 Windows
+Скачайте программу для своей системы — **Python не нужен**:
 
-1. Установите [Python 3](https://www.python.org/downloads/) — при установке отметьте **«Add python.exe to PATH»**.
-2. Скачайте [**Cheburcheck-Multi.zip**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi.zip) из последнего релиза и распакуйте.
-3. Дважды щёлкните **`start.bat`**.
+| Система | Скачать |
+|---|---|
+| 🪟 **Windows 10 / 11** | [**Cheburcheck-Multi-Windows-x64.exe**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi-Windows-x64.exe) |
+| 🐧 **Linux** x64 | [**Cheburcheck-Multi-Linux-x64.tar.gz**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi-Linux-x64.tar.gz) |
+| 🐧 **Linux** ARM64 · Raspberry Pi | [**Cheburcheck-Multi-Linux-arm64.tar.gz**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi-Linux-arm64.tar.gz) |
+| 🍎 **macOS** Apple Silicon | [**Cheburcheck-Multi-macOS-arm64.tar.gz**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi-macOS-arm64.tar.gz) |
+| 🧩 Любая система с Python 3.8+ | [Cheburcheck-Multi.zip](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi.zip) |
 
-### 🐧 Linux / 🍎 macOS
+**Windows** — запустите `.exe`. Если появится «Windows защитила ваш компьютер», нажмите **Подробнее → Выполнить в любом случае** (программа не подписана сертификатом).
+
+**Linux:**
+
+```bash
+tar xzf Cheburcheck-Multi-Linux-*.tar.gz
+./cheburcheck-multi
+```
+
+**macOS** — неподписанную программу нужно один раз разблокировать:
+
+```bash
+tar xzf Cheburcheck-Multi-macOS-arm64.tar.gz
+xattr -d com.apple.quarantine cheburcheck-multi
+./cheburcheck-multi
+```
+
+<details>
+<summary><b>Запуск из исходников (Python 3.8+)</b></summary>
+
+Windows: установите [Python 3](https://www.python.org/downloads/) с галочкой **«Add python.exe to PATH»**, распакуйте [Cheburcheck-Multi.zip](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi.zip) и запустите `start.bat`.
+
+Linux / macOS:
 
 ```bash
 git clone https://github.com/h0r1ze/Cheburcheck-Multi.git
@@ -98,7 +124,9 @@ cd Cheburcheck-Multi
 ./start.sh
 ```
 
-Браузер откроется сам на **http://127.0.0.1:18765/**. Повторный запуск не создаёт вторую копию — просто открывает вкладку. Остановить: `Ctrl+C` в окне консоли.
+</details>
+
+Браузер откроется сам на **http://127.0.0.1:18765/**. Повторный запуск не создаёт вторую копию — просто открывает вкладку. Остановить: `Ctrl+C` или закрыть окно консоли. Список серверов хранится в `state.json` рядом с программой.
 
 <details>
 <summary><b>Параметры запуска</b></summary>
@@ -108,6 +136,8 @@ python3 cheburcheck.py --port 18765    # другой порт (если зан�
 python3 cheburcheck.py --no-browser    # не открывать браузер
 python3 cheburcheck.py --host 0.0.0.0  # доступ из локальной сети (осторожно: без пароля)
 python3 cheburcheck.py --verbose       # логировать запросы
+python3 cheburcheck.py --version       # показать версию
+# то же самое работает и с готовой программой: cheburcheck-multi --port 18765 …
 ```
 
 </details>
@@ -154,9 +184,10 @@ flowchart LR
 |---|---|
 | `cheburcheck.py` | локальный сервер: страница, прокси к API, очередь проб, `state.json` |
 | `index.html` | интерфейс целиком (HTML + CSS + JS) |
-| `start.bat` / `start.sh` | запуск на Windows / Linux и macOS |
+| `start.bat` / `start.sh` | запуск из исходников на Windows / Linux и macOS |
+| `.github/workflows/release.yml` | сборка программ под Windows, Linux, macOS и публикация релиза |
 | `docs/` | картинки для README |
-| `state.json` | ваши серверы и результаты — создаётся при работе, **в git не попадает** |
+| `state.json` | ваши серверы и результаты — создаётся рядом с программой, **в git не попадает** |
 
 </details>
 

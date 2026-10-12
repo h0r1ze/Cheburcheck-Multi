@@ -3,6 +3,7 @@
 Cheburcheck Multi — пакетная проверка адресов (VPN-серверов) через https://cheburcheck.ru
 
 Запуск:  python3 cheburcheck.py   (Windows: start.bat, Linux: ./start.sh)
+         или готовая программа cheburcheck-multi из релиза — Python не нужен
 Опции:   --port 18765   --no-browser   --host 127.0.0.1
 
 Нужен только Python 3.8+, сторонние библиотеки не требуются.
@@ -17,6 +18,7 @@ import os
 import re
 import shutil
 import socket
+import ssl
 import subprocess
 import sys
 import threading
@@ -28,12 +30,44 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 APP_ID = "cheburcheck-multi"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 BASE = "https://cheburcheck.ru"
 UA = "Mozilla/5.0 (cheburcheck-multi; +https://cheburcheck.ru)"
 HERE = os.path.dirname(os.path.abspath(__file__))
-INDEX = os.path.join(HERE, "index.html")
-STATE = os.path.join(HERE, "state.json")
+# В готовой сборке (PyInstaller) index.html лежит во временной папке распаковки,
+# а state.json хранится рядом с самой программой — как и рядом со скриптом.
+FROZEN = getattr(sys, "frozen", False)
+INDEX = os.path.join(getattr(sys, "_MEIPASS", HERE), "index.html")
+
+
+def state_path():
+    base = os.path.dirname(os.path.abspath(sys.executable)) if FROZEN else HERE
+    if os.access(base, os.W_OK):
+        return os.path.join(base, "state.json")
+    # папка программы недоступна для записи (например, Program Files) — пишем в профиль пользователя
+    if sys.platform.startswith("win"):
+        base = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "Cheburcheck-Multi")
+    elif sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support/Cheburcheck-Multi")
+    else:
+        base = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "cheburcheck-multi")
+    os.makedirs(base, exist_ok=True)
+    return os.path.join(base, "state.json")
+
+
+STATE = state_path()
+
+
+def ssl_context():
+    """Корневые сертификаты: из certifi, если он есть (кладём его в готовые сборки), иначе системные."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
+SSL_CTX = ssl_context()
 JOB_RE = re.compile(r"^[0-9a-fA-F-]{8,64}$")
 MAX_STATE = 20 * 1024 * 1024
 
@@ -129,7 +163,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             for attempt in range(CHECK_RETRIES + 1):
                 try:
-                    with urllib.request.urlopen(req, timeout=60) as r:
+                    with urllib.request.urlopen(req, timeout=60, context=SSL_CTX) as r:
                         return self.send_bytes(200, r.read(), "application/json; charset=utf-8")
                 except urllib.error.HTTPError as e:
                     # лимит сайта: 30 проверок в минуту с одного IP
@@ -162,7 +196,7 @@ class Handler(BaseHTTPRequestHandler):
         with probe_lock:
             while True:
                 try:
-                    return urllib.request.urlopen(req, timeout=120)
+                    return urllib.request.urlopen(req, timeout=120, context=SSL_CTX)
                 except urllib.error.HTTPError as e:
                     if e.code == 429 and waited < PROBE_MAX_WAIT:
                         self.sse("wait", {"seconds": PROBE_RETRY_DELAY, "waited": waited})
@@ -273,6 +307,7 @@ def main():
     url = f"http://{shown_host}:{httpd.server_address[1]}/"
     print(f"Cheburcheck Multi v{VERSION} запущен: {url}", flush=True)
     print("Остановить: Ctrl+C (или закройте это окно)", flush=True)
+    print(f"Список серверов хранится в: {STATE}", flush=True)
     if not args.no_browser:
         def _open():
             if not open_browser(url):

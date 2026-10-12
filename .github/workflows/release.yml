@@ -1,0 +1,115 @@
+name: Release
+
+# Сборка готовых программ (без Python) под Windows, Linux и macOS и публикация релиза.
+# Запускается при пуше тега vX.Y.Z или вручную (Actions → Release → Run workflow) для уже существующего тега.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Тег, для которого собрать и выложить файлы (например, v1.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    name: Сборка ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows-x64, os: windows-latest }
+          - { name: Linux-x64,   os: ubuntu-22.04 }
+          - { name: Linux-arm64, os: ubuntu-22.04-arm }
+          - { name: macOS-arm64, os: macos-latest }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установка PyInstaller
+        run: python -m pip install "pyinstaller>=6,<7" certifi
+
+      - name: Сборка
+        run: >
+          python -m PyInstaller --onefile --clean --noconfirm
+          --name cheburcheck-multi --icon docs/icon.ico
+          --add-data "index.html:." cheburcheck.py
+
+      - name: Проверка сборки
+        run: |
+          BIN=dist/cheburcheck-multi; [ -f "$BIN.exe" ] && BIN="$BIN.exe"
+          "$BIN" --version
+          "$BIN" --no-browser --port 18765 > run.log 2>&1 &
+          PID=$!
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:18765/api/ping && break; sleep 1; done
+          echo
+          curl -sf http://127.0.0.1:18765/ | grep -q "<title>Cheburcheck Multi"
+          curl -s -m 60 "http://127.0.0.1:18765/api/check?target=8.8.8.8" | grep -q '"target"' \
+            && echo "HTTPS до cheburcheck.ru работает" \
+            || echo "::warning::HTTPS-запрос к cheburcheck.ru из сборки ${{ matrix.name }} не прошёл"
+          cat run.log
+          if [ "$RUNNER_OS" = Windows ]; then taskkill //F //IM cheburcheck-multi.exe || true; else kill $PID || true; fi
+
+      - name: Упаковка
+        run: |
+          mkdir -p out
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp dist/cheburcheck-multi.exe "out/Cheburcheck-Multi-${{ matrix.name }}.exe"
+          else
+            tar -czf "out/Cheburcheck-Multi-${{ matrix.name }}.tar.gz" -C dist cheburcheck-multi
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: out/*
+          if-no-files-found: error
+
+  release:
+    name: Публикация релиза
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: Архив для запуска через Python
+        run: >
+          git archive --format=zip --prefix=Cheburcheck-Multi/ -o out/Cheburcheck-Multi.zip HEAD
+          cheburcheck.py index.html start.bat start.sh README.md LICENSE docs
+
+      - name: Контрольные суммы
+        run: cd out && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" out/* --clobber
+          else
+            sed "s/{{TAG}}/$TAG/g" .github/release-notes.md > notes.md
+            gh release create "$TAG" out/* --verify-tag --title "Cheburcheck Multi $TAG" \
+              --notes-file notes.md --generate-notes
+          fi
