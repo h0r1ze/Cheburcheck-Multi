@@ -59,9 +59,10 @@ jobs:
           ok=1
           for i in $(seq 1 30); do curl -sf -m 2 http://127.0.0.1:18765/api/ping && ok=0 && break; sleep 1; done
           echo
-          [ $ok = 0 ] && { curl -sf http://127.0.0.1:18765/ | grep -q "<title>Cheburcheck Multi" || ok=1; }
+          # ответы сначала в файл: при pipefail «curl | grep -q» может упасть с SIGPIPE
+          [ $ok = 0 ] && { curl -sf -o page.html http://127.0.0.1:18765/ && grep -q "<title>Cheburcheck Multi" page.html || ok=1; }
           if [ $ok = 0 ]; then
-            curl -s -m 60 "http://127.0.0.1:18765/api/check?target=8.8.8.8" | grep -q '"target"' \
+            curl -s -m 60 -o check.json "http://127.0.0.1:18765/api/check?target=8.8.8.8" || true; grep -q '"target"' check.json \
               && echo "HTTPS до cheburcheck.ru работает" \
               || echo "::warning::HTTPS-запрос к cheburcheck.ru из сборки ${{ matrix.name }} не прошёл"
           fi
