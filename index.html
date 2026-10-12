@@ -108,6 +108,16 @@ try { window.applyTheme(localStorage.getItem("cheburcheck-theme") || "auto"); } 
   .tile .vd { font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
   .tile .sm { font-size: 11px; color: var(--muted); margin-top: auto; }
   .tile.add { border-style: dashed; align-items: center; justify-content: center; color: var(--muted); background: transparent; }
+  /* перетаскивание плиток */
+  .tile[data-id] { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+  .tile.placeholder { opacity: .3; outline: 2px dashed var(--border2); outline-offset: -2px; }
+  .tile.ghost { position: fixed; z-index: 50; margin: 0; pointer-events: none; background: var(--panel);
+                transform: rotate(1.5deg) scale(1.03); box-shadow: 0 14px 34px rgba(0, 0, 0, .35); }
+  /* фон плитки полупрозрачный — у «летящей» копии кладём его поверх сплошного, чтобы не просвечивали соседи */
+  .tile.ghost.t-green { background: linear-gradient(var(--green-bg), var(--green-bg)), var(--panel); }
+  .tile.ghost.t-red { background: linear-gradient(var(--red-bg), var(--red-bg)), var(--panel); }
+  .tile.ghost.t-amber { background: linear-gradient(var(--amber-bg), var(--amber-bg)), var(--panel); }
+  body.dragging, body.dragging * { cursor: grabbing !important; }
 
   /* панель деталей */
   .detail { border: 1px solid var(--border); background: var(--panel); margin-top: 14px; padding: 16px; }
@@ -182,7 +192,7 @@ try { window.applyTheme(localStorage.getItem("cheburcheck-theme") || "auto"); } 
     </div>
   </header>
   <div class="descrow">
-    <span>Светофор: цвет плитки = итоговый вердикт. Клик по плитке — подробности и редактирование ниже.</span>
+    <span>Светофор: цвет плитки = итоговый вердикт. Клик по плитке — подробности ниже, перетаскивание — поменять порядок.</span>
     <span class="summary" id="summary"></span>
   </div>
   <div class="tiles" id="tiles"></div>
@@ -385,6 +395,7 @@ function barHtml(counts, total) {
 
 // ---------- плитки ----------
 function renderTiles() {
+  if (drag.active) { drag.pending = true; return; }   // перерисуем после отпускания
   const box = $("#tiles");
   box.innerHTML = state.servers.map(srv => {
     const s = summarize(srv);
@@ -446,6 +457,8 @@ function renderDetail() {
       <button class="ghost icon" id="renameBtn" title="Переименовать">✎</button>
       <input type="text" class="link" id="linkInput" placeholder="IP, домен или ссылка vless://…" spellcheck="false" value="${esc(srv.target)}">
       <button id="goBtn"></button>
+      <button class="ghost icon" id="leftBtn" title="Переместить левее (Alt+←)">←</button>
+      <button class="ghost icon" id="rightBtn" title="Переместить правее (Alt+→)">→</button>
       <button class="ghost" id="delBtn">Удалить</button>
     </div>
     <div class="hint" id="hostHint"></div>
@@ -459,6 +472,11 @@ function renderDetail() {
   input.addEventListener("keydown", e => { if (e.key === "Enter") runCheck(srv.id); });
   $("#goBtn").onclick = () => running[srv.id] ? stopCheck(srv.id) : runCheck(srv.id);
   $("#delBtn").onclick = () => deleteServer(srv.id);
+  const idx = state.servers.indexOf(srv);
+  $("#leftBtn").disabled = idx <= 0;
+  $("#rightBtn").disabled = idx >= state.servers.length - 1;
+  $("#leftBtn").onclick = () => moveServer(srv.id, -1);
+  $("#rightBtn").onclick = () => moveServer(srv.id, 1);
   updateHint();
   renderDetailBody();
 }
@@ -738,6 +756,125 @@ async function importFile(file) {
   toast(`Импортировано адресов: ${items.length}`);
 }
 
+// ---------- порядок плиток ----------
+function moveServer(id, delta) {
+  const i = state.servers.findIndex(s => s.id === id), j = i + delta;
+  if (i < 0 || j < 0 || j >= state.servers.length) return;
+  [state.servers[i], state.servers[j]] = [state.servers[j], state.servers[i]];
+  renderTiles(); renderDetail(); save();
+}
+// Alt+стрелки на плитке в фокусе
+$("#tiles").addEventListener("keydown", e => {
+  const t = e.target.closest(".tile[data-id]");
+  if (!t || !e.altKey) return;
+  const delta = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key];
+  if (!delta) return;
+  e.preventDefault();
+  moveServer(t.dataset.id, delta);
+  $(`.tile[data-id="${t.dataset.id}"]`)?.focus();
+});
+
+// Перетаскивание: мышью — сразу после сдвига на несколько пикселей,
+// пальцем — после долгого нажатия (обычный свайп по-прежнему прокручивает страницу).
+const drag = { id: null, el: null, ghost: null, active: false, pending: false, justDropped: false,
+               pointerId: null, startX: 0, startY: 0, offX: 0, offY: 0, timer: null, lastX: 0, lastY: 0, scroll: null };
+
+$("#tiles").addEventListener("pointerdown", e => {
+  if (e.button !== 0 || drag.active) return;
+  const t = e.target.closest(".tile[data-id]");
+  if (!t) return;
+  Object.assign(drag, { id: t.dataset.id, el: t, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY });
+  if (e.pointerType === "touch") drag.timer = setTimeout(() => startDrag(), 350);
+});
+document.addEventListener("pointermove", e => {
+  if (!drag.id || e.pointerId !== drag.pointerId) return;
+  drag.lastX = e.clientX; drag.lastY = e.clientY;
+  if (!drag.active) {
+    if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < 6) return;
+    if (e.pointerType === "touch") { clearTimeout(drag.timer); drag.id = null; return; }   // это прокрутка
+    startDrag();
+  }
+  moveDrag(e.clientX, e.clientY);
+});
+document.addEventListener("pointerup", e => { if (e.pointerId === drag.pointerId) endDrag(true); });
+document.addEventListener("pointercancel", e => { if (e.pointerId === drag.pointerId) endDrag(false); });
+document.addEventListener("touchmove", e => { if (drag.active) e.preventDefault(); }, { passive: false });
+$("#tiles").addEventListener("contextmenu", e => { if (drag.id) e.preventDefault(); });
+addEventListener("keydown", e => { if (e.key === "Escape" && drag.active) endDrag(false); });
+
+function startDrag() {
+  clearTimeout(drag.timer);
+  if (!drag.el?.isConnected) { drag.id = null; return; }
+  drag.active = true;
+  const r = drag.el.getBoundingClientRect();
+  drag.offX = drag.startX - r.left; drag.offY = drag.startY - r.top;
+  const g = drag.el.cloneNode(true);
+  g.classList.add("ghost");
+  g.removeAttribute("data-id");
+  Object.assign(g.style, { width: r.width + "px", height: r.height + "px", left: r.left + "px", top: r.top + "px" });
+  document.body.appendChild(g);
+  drag.ghost = g;
+  drag.el.classList.add("placeholder");
+  document.body.classList.add("dragging");
+  try { $("#tiles").setPointerCapture(drag.pointerId); } catch {}
+  if (navigator.vibrate) try { navigator.vibrate(12); } catch {}
+  drag.scroll = setInterval(autoScroll, 16);
+  moveDrag(drag.lastX, drag.lastY);
+}
+// у края окна страница прокручивается сама — можно тащить плитку далеко вниз/вверх
+function autoScroll() {
+  const edge = 70, y = drag.lastY;
+  const dy = y < edge ? -(edge - y) / 4 : y > innerHeight - edge ? (y - (innerHeight - edge)) / 4 : 0;
+  if (dy) { scrollBy(0, dy); moveDrag(drag.lastX, drag.lastY); }
+}
+function moveDrag(x, y) {
+  if (!drag.active) return;
+  drag.ghost.style.left = x - drag.offX + "px";
+  drag.ghost.style.top = y - drag.offY + "px";
+  const under = document.elementFromPoint(x, y)?.closest("#tiles .tile[data-id]");
+  if (!under || under === drag.el) return;
+  const r = under.getBoundingClientRect();
+  const oneCol = r.width > $("#tiles").clientWidth * 0.7;     // на узком экране плитки в столбик
+  const after = oneCol ? y > r.top + r.height / 2 : x > r.left + r.width / 2;
+  const ref = after ? under.nextElementSibling : under;
+  if (ref === drag.el || ref === drag.el.nextElementSibling) return;
+  animateMove(() => $("#tiles").insertBefore(drag.el, ref));
+}
+// FLIP: остальные плитки плавно съезжают на новые места
+function animateMove(mutate) {
+  const tiles = [...$("#tiles").children];
+  const before = new Map(tiles.map(t => [t, t.getBoundingClientRect()]));
+  mutate();
+  for (const t of tiles) {
+    if (t === drag.el) continue;
+    const a = before.get(t), b = t.getBoundingClientRect();
+    const dx = a.left - b.left, dy = a.top - b.top;
+    if (!dx && !dy) continue;
+    t.style.transition = "none";
+    t.style.transform = `translate(${dx}px, ${dy}px)`;
+    requestAnimationFrame(() => { t.style.transition = "transform .18s ease"; t.style.transform = ""; });
+  }
+}
+function endDrag(commit) {
+  clearTimeout(drag.timer);
+  if (drag.active) {
+    clearInterval(drag.scroll);
+    drag.ghost?.remove();
+    drag.el?.classList.remove("placeholder");
+    document.body.classList.remove("dragging");
+    drag.active = false;
+    drag.justDropped = true;                       // гасим клик, который придёт следом за отпусканием
+    setTimeout(() => { drag.justDropped = false; }, 50);
+    const order = [...$("#tiles").querySelectorAll(".tile[data-id]")].map(t => t.dataset.id);
+    const changed = commit && order.join() !== state.servers.map(s => s.id).join();
+    if (changed) state.servers.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    renderTiles();                                  // при отмене вернёт прежний порядок
+    if (changed) { renderDetail(); save(); }
+    drag.pending = false;
+  }
+  drag.id = null; drag.el = null; drag.ghost = null;
+}
+
 // ---------- темы ----------
 function currentTheme() {
   try { return localStorage.getItem("cheburcheck-theme") || "auto"; } catch { return state.theme || "auto"; }
@@ -777,6 +914,7 @@ addEventListener("keydown", e => { if (e.key === "Escape") $("#themePop").classL
 
 // ---------- кнопки ----------
 $("#tiles").addEventListener("click", e => {
+  if (drag.justDropped) { drag.justDropped = false; return; }
   if (e.target.closest("#addTile")) return addServer();
   const t = e.target.closest(".tile[data-id]");
   if (t) select(t.dataset.id);
