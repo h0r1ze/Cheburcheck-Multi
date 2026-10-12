@@ -277,6 +277,13 @@ def running_instance(host, port):
 
 
 def main():
+    # Русский текст не должен ронять программу, если вывод перенаправлен в файл
+    # (на Windows тогда используется cp1252) или консоль в другой кодировке.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     ap = argparse.ArgumentParser(description="Cheburcheck Multi — пакетная проверка адресов")
     ap.add_argument("--version", action="version", version=f"Cheburcheck Multi {VERSION}")
     ap.add_argument("--host", default="127.0.0.1")

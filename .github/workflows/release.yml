@@ -56,14 +56,18 @@ jobs:
           "$BIN" --version
           "$BIN" --no-browser --port 18765 > run.log 2>&1 &
           PID=$!
-          for i in $(seq 1 30); do curl -sf http://127.0.0.1:18765/api/ping && break; sleep 1; done
+          ok=1
+          for i in $(seq 1 30); do curl -sf -m 2 http://127.0.0.1:18765/api/ping && ok=0 && break; sleep 1; done
           echo
-          curl -sf http://127.0.0.1:18765/ | grep -q "<title>Cheburcheck Multi"
-          curl -s -m 60 "http://127.0.0.1:18765/api/check?target=8.8.8.8" | grep -q '"target"' \
-            && echo "HTTPS до cheburcheck.ru работает" \
-            || echo "::warning::HTTPS-запрос к cheburcheck.ru из сборки ${{ matrix.name }} не прошёл"
-          cat run.log
+          [ $ok = 0 ] && { curl -sf http://127.0.0.1:18765/ | grep -q "<title>Cheburcheck Multi" || ok=1; }
+          if [ $ok = 0 ]; then
+            curl -s -m 60 "http://127.0.0.1:18765/api/check?target=8.8.8.8" | grep -q '"target"' \
+              && echo "HTTPS до cheburcheck.ru работает" \
+              || echo "::warning::HTTPS-запрос к cheburcheck.ru из сборки ${{ matrix.name }} не прошёл"
+          fi
+          echo "--- вывод программы ---"; cat run.log
           if [ "$RUNNER_OS" = Windows ]; then taskkill //F //IM cheburcheck-multi.exe || true; else kill $PID || true; fi
+          [ $ok = 0 ] || { echo "::error::Сборка ${{ matrix.name }} не отвечает"; exit 1; }
 
       - name: Упаковка
         run: |
