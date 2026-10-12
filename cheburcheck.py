@@ -28,6 +28,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 APP_ID = "cheburcheck-multi"
+VERSION = "1.0.0"
 BASE = "https://cheburcheck.ru"
 UA = "Mozilla/5.0 (cheburcheck-multi; +https://cheburcheck.ru)"
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -81,7 +82,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/state":
                 self.get_state()
             elif path == "/api/ping":
-                self.send_json(200, {"app": APP_ID})
+                self.send_json(200, {"app": APP_ID, "version": VERSION})
             elif path == "/api/check":
                 target = urllib.parse.parse_qs(url.query).get("target", [""])[0].strip()
                 self.check(target)
@@ -243,6 +244,7 @@ def running_instance(host, port):
 
 def main():
     ap = argparse.ArgumentParser(description="Cheburcheck Multi — пакетная проверка адресов")
+    ap.add_argument("--version", action="version", version=f"Cheburcheck Multi {VERSION}")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=18765)
     ap.add_argument("--no-browser", action="store_true", help="не открывать браузер автоматически")
@@ -269,7 +271,7 @@ def main():
     httpd.daemon_threads = True
 
     url = f"http://{shown_host}:{httpd.server_address[1]}/"
-    print(f"Cheburcheck Multi запущен: {url}", flush=True)
+    print(f"Cheburcheck Multi v{VERSION} запущен: {url}", flush=True)
     print("Остановить: Ctrl+C (или закройте это окно)", flush=True)
     if not args.no_browser:
         def _open():

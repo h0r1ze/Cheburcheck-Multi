@@ -8,13 +8,14 @@
 
 Вставьте ссылки `vless://` · `vmess://` · `trojan://` · `ss://` · `hysteria2://` — и увидите, какие серверы режет ТСПУ, у каких операторов и в каких регионах.
 
+[![Release](https://img.shields.io/github/v/release/h0r1ze/Cheburcheck-Multi?color=22c55e&label=%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F)](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest)
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![Windows · Linux · macOS](https://img.shields.io/badge/Windows%20%C2%B7%20Linux%20%C2%B7%20macOS-0a0a0a?logo=windowsterminal&logoColor=white)](#-быстрый-старт)
 [![Зависимости: 0](https://img.shields.io/badge/%D0%B7%D0%B0%D0%B2%D0%B8%D1%81%D0%B8%D0%BC%D0%BE%D1%81%D1%82%D0%B8-0-22c55e)](#-как-это-устроено)
 [![License: MIT](https://img.shields.io/github/license/h0r1ze/Cheburcheck-Multi?color=f59e0b)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/h0r1ze/Cheburcheck-Multi?style=flat&color=ef4444)](https://github.com/h0r1ze/Cheburcheck-Multi/stargazers)
 
-[**⬇ Скачать**](https://github.com/h0r1ze/Cheburcheck-Multi/archive/refs/heads/main.zip) ·
+[**⬇ Скачать**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi.zip) ·
 [Быстрый старт](#-быстрый-старт) ·
 [Как читать результат](#-как-читать-результат) ·
 [Темы](#-10-тем-оформления) ·
@@ -83,30 +84,19 @@
 
 ## 🚀 Быстрый старт
 
-<table>
-<tr>
-<th>🪟 Windows</th>
-<th>🐧 Linux / 🍎 macOS</th>
-</tr>
-<tr>
-<td valign="top">
+### 🪟 Windows
 
-1. Установите [Python 3](https://www.python.org/downloads/) — отметьте **«Add python.exe to PATH»**.
-2. [Скачайте архив](https://github.com/h0r1ze/Cheburcheck-Multi/archive/refs/heads/main.zip) и распакуйте.
+1. Установите [Python 3](https://www.python.org/downloads/) — при установке отметьте **«Add python.exe to PATH»**.
+2. Скачайте [**Cheburcheck-Multi.zip**](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest/download/Cheburcheck-Multi.zip) из последнего релиза и распакуйте.
 3. Дважды щёлкните **`start.bat`**.
 
-</td>
-<td valign="top">
+### 🐧 Linux / 🍎 macOS
 
 ```bash
 git clone https://github.com/h0r1ze/Cheburcheck-Multi.git
 cd Cheburcheck-Multi
 ./start.sh
 ```
-
-</td>
-</tr>
-</table>
 
 Браузер откроется сам на **http://127.0.0.1:18765/**. Повторный запуск не создаёт вторую копию — просто открывает вкладку. Остановить: `Ctrl+C` в окне консоли.
 
