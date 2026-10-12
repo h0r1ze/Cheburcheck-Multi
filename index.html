@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cheburcheck Multi</title>
+<script>
+// Темы оформления. Задаются здесь, в <head>, чтобы применить тему до отрисовки страницы (без мигания).
+window.THEMES = {
+  dark:      { name: "Чебурчек",      scheme: "dark",  c: { bg: "#0a0a0a", panel: "#121212", panel2: "#181818", border: "#262626", border2: "#404040", text: "#d4d4d4", muted: "#737373", strong: "#fafafa", red: "#ef4444", green: "#22c55e", amber: "#f59e0b", accent: "#fafafa", onAccent: "#0a0a0a" } },
+  light:     { name: "Светлая",       scheme: "light", c: { bg: "#fafafa", panel: "#ffffff", panel2: "#f5f5f5", border: "#e5e5e5", border2: "#a3a3a3", text: "#262626", muted: "#737373", strong: "#0a0a0a", red: "#dc2626", green: "#16a34a", amber: "#d97706", accent: "#0a0a0a", onAccent: "#fafafa" } },
+  midnight:  { name: "Полночь",       scheme: "dark",  c: { bg: "#0b1020", panel: "#111830", panel2: "#18213f", border: "#243055", border2: "#3a4a7a", text: "#c9d4f0", muted: "#7684a8", strong: "#f0f4ff", red: "#f87171", green: "#34d399", amber: "#fbbf24", accent: "#60a5fa", onAccent: "#0b1020" } },
+  terminal:  { name: "Терминал",      scheme: "dark",  c: { bg: "#050805", panel: "#0a120a", panel2: "#0f1a0f", border: "#1a3a1a", border2: "#2c5a2c", text: "#9cf09c", muted: "#4f8a4f", strong: "#c8ffc8", red: "#ff5555", green: "#39ff14", amber: "#ffcc00", accent: "#39ff14", onAccent: "#050805" } },
+  dracula:   { name: "Дракула",       scheme: "dark",  c: { bg: "#282a36", panel: "#2f3240", panel2: "#363949", border: "#44475a", border2: "#6272a4", text: "#f8f8f2", muted: "#8790b5", strong: "#ffffff", red: "#ff5555", green: "#50fa7b", amber: "#ffb86c", accent: "#bd93f9", onAccent: "#282a36" } },
+  nord:      { name: "Норд",          scheme: "dark",  c: { bg: "#2e3440", panel: "#3b4252", panel2: "#434c5e", border: "#4c566a", border2: "#616e88", text: "#d8dee9", muted: "#8a94a8", strong: "#eceff4", red: "#bf616a", green: "#a3be8c", amber: "#ebcb8b", accent: "#88c0d0", onAccent: "#2e3440" } },
+  solarized: { name: "Соляризация",   scheme: "light", c: { bg: "#fdf6e3", panel: "#fffbee", panel2: "#eee8d5", border: "#e4dcc4", border2: "#93a1a1", text: "#586e75", muted: "#839496", strong: "#073642", red: "#dc322f", green: "#859900", amber: "#b58900", accent: "#268bd2", onAccent: "#fdf6e3" } },
+  gruvbox:   { name: "Груввокс",      scheme: "dark",  c: { bg: "#282828", panel: "#32302f", panel2: "#3c3836", border: "#504945", border2: "#665c54", text: "#ebdbb2", muted: "#a89984", strong: "#fbf1c7", red: "#fb4934", green: "#b8bb26", amber: "#fabd2f", accent: "#fe8019", onAccent: "#282828" } },
+  sepia:     { name: "Сепия",         scheme: "light", c: { bg: "#f4ecd8", panel: "#faf4e4", panel2: "#ede3cb", border: "#dccfae", border2: "#b5a37c", text: "#4a3f2c", muted: "#8a7a5c", strong: "#2b2214", red: "#b23a2b", green: "#4f7a28", amber: "#b0731a", accent: "#5b4636", onAccent: "#f4ecd8" } },
+  contrast:  { name: "Контраст",      scheme: "dark",  c: { bg: "#000000", panel: "#000000", panel2: "#111111", border: "#8a8a8a", border2: "#ffffff", text: "#ffffff", muted: "#c8c8c8", strong: "#ffffff", red: "#ff4d4d", green: "#3dff6e", amber: "#ffd000", accent: "#ffff00", onAccent: "#000000" } },
+};
+window.applyTheme = function (id) {
+  const root = document.documentElement, t = window.THEMES[id];
+  const kebab = k => "--" + k.replace(/[A-Z]/g, m => "-" + m.toLowerCase());
+  const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+  const all = ["bg", "panel", "panel2", "border", "border2", "text", "muted", "strong", "red", "green", "amber", "accent", "onAccent",
+               "redBg", "redBd", "greenBg", "greenBd", "amberBg", "amberBd", "grayBg"];
+  all.forEach(k => root.style.removeProperty(kebab(k)));
+  root.style.colorScheme = "";
+  if (!t) { root.removeAttribute("data-theme"); return; }   // «Авто»: тёмная/светлая по системе (CSS ниже)
+  for (const [k, v] of Object.entries(t.c)) root.style.setProperty(kebab(k), v);
+  for (const k of ["red", "green", "amber"]) {
+    root.style.setProperty(`--${k}-bg`, rgba(t.c[k], t.scheme === "light" ? .1 : .13));
+    root.style.setProperty(`--${k}-bd`, rgba(t.c[k], .35));
+  }
+  root.style.setProperty("--gray-bg", rgba(t.c.muted, .14));
+  root.style.colorScheme = t.scheme;
+  root.dataset.theme = id;
+};
+try { window.applyTheme(localStorage.getItem("cheburcheck-theme") || "auto"); } catch (e) {}
+</script>
+<style>
+  :root {
+    --bg: #0a0a0a; --panel: #121212; --panel2: #181818; --border: #262626; --border2: #404040;
+    --text: #d4d4d4; --muted: #737373; --strong: #fafafa; --accent: #fafafa; --on-accent: #0a0a0a;
+    --red: #ef4444; --red-bg: rgba(239,68,68,.12); --red-bd: rgba(239,68,68,.3);
+    --green: #22c55e; --green-bg: rgba(34,197,94,.12); --green-bd: rgba(34,197,94,.3);
+    --amber: #f59e0b; --amber-bg: rgba(245,158,11,.12); --amber-bd: rgba(245,158,11,.3);
+    --gray-bg: rgba(115,115,115,.14);
+    --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Consolas, "DejaVu Sans Mono", monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #fafafa; --panel: #fff; --panel2: #f5f5f5; --border: #e5e5e5; --border2: #a3a3a3;
+            --text: #262626; --muted: #737373; --strong: #0a0a0a; --red: #dc2626; --green: #16a34a; --amber: #d97706;
+            --accent: #0a0a0a; --on-accent: #fafafa; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.5 var(--mono); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+  button, input, select { font: inherit; color: inherit; }
+  button { background: var(--panel2); border: 1px solid var(--border2); color: var(--strong); padding: 7px 12px; cursor: pointer;
+           text-transform: uppercase; font-size: 11px; font-weight: bold; white-space: nowrap; }
+  button:hover:not(:disabled) { border-color: var(--muted); filter: brightness(1.15); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  button.ghost { background: transparent; border-color: var(--border); color: var(--muted); }
+  button.icon { padding: 7px 10px; }
+  input[type=text], select { background: var(--panel2); border: 1px solid var(--border); padding: 7px 9px; outline: none; min-width: 0; }
+  input[type=text]:focus, select:focus { border-color: var(--border2); }
+  select { cursor: pointer; }
+  a { color: var(--muted); }
+
+  header { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;
+           border-bottom: 1px solid var(--border); padding-bottom: 14px; margin-bottom: 14px; }
+  h1 { margin: 0; font-size: 20px; color: var(--strong); text-transform: uppercase; letter-spacing: -.02em; }
+  h1 small { font-size: 11px; color: var(--muted); font-weight: normal; text-transform: none; margin-left: 8px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
+  .save-state { font-size: 11px; color: var(--muted); min-width: 110px; text-align: right; }
+  .descrow { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: center; margin-bottom: 14px; color: var(--muted); font-size: 12px; }
+  .summary { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; font-size: 11px; border: 1px solid transparent; white-space: nowrap; }
+  .b-red { color: var(--red); background: var(--red-bg); border-color: var(--red-bd); }
+  .b-green { color: var(--green); background: var(--green-bg); border-color: var(--green-bd); }
+  .b-amber { color: var(--amber); background: var(--amber-bg); border-color: var(--amber-bd); }
+  .b-gray { color: var(--muted); background: var(--gray-bg); border-color: var(--border); }
+  .c-red { color: var(--red); } .c-green { color: var(--green); } .c-amber { color: var(--amber); } .c-gray { color: var(--muted); }
+  .bar { display: flex; height: 6px; background: var(--border); overflow: hidden; }
+  .bar span { display: block; height: 100%; }
+  .spin { display: inline-block; width: 9px; height: 9px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: s .8s linear infinite; flex: none; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  .muted { color: var(--muted); }
+
+  /* плитки */
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .tile { border: 1px solid var(--border); padding: 14px; cursor: pointer; min-height: 132px; display: flex; flex-direction: column; gap: 7px;
+          background: var(--panel); text-align: left; font: inherit; color: inherit; text-transform: none; font-weight: normal; }
+  .tile:hover { filter: none; border-color: var(--border2); }
+  .tile.t-green { background: var(--green-bg); border-color: var(--green-bd); }
+  .tile.t-red { background: var(--red-bg); border-color: var(--red-bd); }
+  .tile.t-amber { background: var(--amber-bg); border-color: var(--amber-bd); }
+  .tile.t-empty { border-style: dashed; background: transparent; }
+  .tile.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tile .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .tile .nm { font-size: 15px; font-weight: bold; color: var(--strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tile .cn { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .tile .vd { font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+  .tile .sm { font-size: 11px; color: var(--muted); margin-top: auto; }
+  .tile.add { border-style: dashed; align-items: center; justify-content: center; color: var(--muted); background: transparent; }
+
+  /* панель деталей */
+  .detail { border: 1px solid var(--border); background: var(--panel); margin-top: 14px; padding: 16px; }
+  .edit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .edit select { width: 230px; }
+  .edit .link { flex: 1; min-width: 220px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; word-break: break-all; }
+  .body { margin-top: 14px; }
+  .head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+  .headline { font-weight: bold; font-size: 16px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .cols { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 24px; margin-top: 14px; }
+  .meta { display: grid; grid-template-columns: 120px 1fr; gap: 4px 12px; font-size: 12px; margin: 0; align-content: start; }
+  .meta dt { color: var(--muted); } .meta dd { margin: 0; word-break: break-all; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: 12px; }
+  th { color: var(--muted); font-weight: normal; font-size: 11px; text-transform: uppercase; }
+  .more { margin-top: 8px; }
+  .err { color: var(--red); }
+  .empty { color: var(--muted); padding: 18px 0 6px; }
+  .toast { position: fixed; right: 16px; bottom: 16px; background: var(--strong); color: var(--bg); padding: 10px 14px; font-size: 12px;
+           opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; z-index: 20; }
+  .toast.show { opacity: 1; transform: none; }
+  footer { margin-top: 24px; font-size: 12px; color: var(--muted); }
+
+  /* выбор темы */
+  header { position: relative; }
+  .theme-pop { position: absolute; right: 0; top: calc(100% - 8px); z-index: 30; width: min(400px, calc(100vw - 32px));
+               background: var(--panel); border: 1px solid var(--border2); padding: 10px; display: none;
+               grid-template-columns: 1fr 1fr; gap: 8px; }
+  .theme-pop.open { display: grid; }
+  .theme-pop .ttl { grid-column: 1 / -1; font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  .th { background: transparent; border: 1px solid var(--border); padding: 6px; color: var(--text); text-transform: none; font-weight: normal;
+        font-size: 12px; text-align: left; display: flex; flex-direction: column; gap: 6px; }
+  .th.on { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .th.auto { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 10px; }
+  .sw { height: 44px; display: flex; gap: 5px; padding: 6px; align-items: stretch; border: 1px solid rgba(128,128,128,.25); }
+  .sw .pn { flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 4px 5px; }
+  .sw .ln { height: 3px; width: 70%; }
+  .sw .dots { display: flex; gap: 3px; }
+  .sw .dots i { width: 7px; height: 7px; border-radius: 50%; }
+  .sw .ac { width: 14px; }
+
+  @media (max-width: 900px) {
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols { grid-template-columns: 1fr; }
+    .hide-m { display: none; }
+  }
+  @media (max-width: 480px) {
+    .tiles { grid-template-columns: 1fr; }
+    .edit select { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Cheburcheck <small>обзор серверов</small></h1>
+    <div class="toolbar">
+      <span class="save-state" id="saveState"></span>
+      <span class="theme-wrap">
+        <button class="ghost" id="themeBtn" title="Тема оформления" aria-haspopup="true">Тема ▾</button>
+        <div class="theme-pop" id="themePop"></div>
+      </span>
+      <button id="saveBtn" title="Сохранить список в state.json">Сохранить</button>
+      <button id="exportBtn" title="Скачать список серверов файлом .json">Экспортировать</button>
+      <button id="importBtn" title="Загрузить .json, список ссылок или подписку">Импортировать</button>
+      <input type="file" id="importFile" accept=".json,.txt,application/json,text/plain" hidden>
+      <span class="sep"></span>
+      <button id="checkAll" class="primary">Проверить все</button>
+      <button id="stopAll">Стоп</button>
+    </div>
+  </header>
+  <div class="descrow">
+    <span>Светофор: цвет плитки = итоговый вердикт. Клик по плитке — подробности и редактирование ниже.</span>
+    <span class="summary" id="summary"></span>
+  </div>
+  <div class="tiles" id="tiles"></div>
+  <div class="detail" id="detail"></div>
+  <footer>
+    Данные: <a href="https://cheburcheck.ru" target="_blank" rel="noopener">cheburcheck.ru</a>.
+    В адрес можно вставить IP, домен, <code>host:port</code>, подсеть, ASN или ссылку
+    <code>vless://</code> / <code>vmess://</code> / <code>trojan://</code> / <code>ss://</code> / <code>hysteria2://</code>.
+    Имя сервера берётся из <code>#фрагмента</code> ссылки, если его не переименовать.
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const PARALLEL = 3, PROBE_TIMEOUT = 180000, DEFAULT_SLOTS = 8;
+
+const VERDICTS = {
+  tspu_block:   { text: "ТСПУ блок",           cls: "red",   title: "Заблокирован", sub: "TCP-блокировка на уровне ТСПУ" },
+  sni_block:    { text: "SNI блок",            cls: "red",   title: "Заблокирован", sub: "Блокировка по имени домена в SNI" },
+  dns_spoofing: { text: "Подмена DNS",         cls: "red",   title: "Заблокирован", sub: "Подмена ответов DNS" },
+  whitelist:    { text: "Исключение для CDN",  cls: "amber", title: "Исключение для CDN", sub: "Снимает ограничение 16–20 КБ к заблокированным CDN" },
+  cdn_block:    { text: "CDN блок (16–20 КБ)", cls: "red",   title: "Недоступен",   sub: "Блокировка CDN (16–20 КБ)" },
+  ok:           { text: "Доступен",            cls: "green", title: "Не ограничен", sub: "Ограничений не обнаружено" },
+  uncertain:    { text: "Неясно",              cls: "gray",  title: "Неясно", sub: "" },
+};
+const PRIORITY = ["tspu_block", "sni_block", "dns_spoofing", "whitelist", "cdn_block", "ok", "uncertain"];
+const BAR_COLORS = { red: "var(--red)", green: "var(--green)", amber: "var(--amber)", gray: "var(--border2)" };
+
+// servers: [{id, label, target}], results: {id: result}, selected: id
+let state = { servers: [], results: {}, selected: null };
+const running = {};      // id -> { es, done }
+let queueAbort = false;
+
+// ---------- utils ----------
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const newId = () => Math.random().toString(36).slice(2, 10);
+function b64decode(s) {
+  s = s.replace(/-/g, "+").replace(/_/g, "/").replace(/\s/g, "");
+  while (s.length % 4) s += "=";
+  const bin = atob(s);
+  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+}
+function stripPort(h) {
+  h = h.trim();
+  let m = h.match(/^\[([^\]]+)\](?::\d+)?$/);   // [ipv6]:port
+  if (m) return m[1];
+  m = h.match(/^([^:\/]+):\d+$/);               // host:port
+  if (m) return m[1];
+  return h;
+}
+/** Достаёт хост из ссылки VPN-конфига или host:port. Подсети/ASN/домены возвращает как есть. */
+function extractHost(raw) {
+  let s = (raw || "").trim();
+  if (!s) return "";
+  let m = s.match(/^vmess:\/\/([^#]+)/i);
+  if (m) { try { const j = JSON.parse(b64decode(m[1])); if (j.add) return String(j.add).trim(); } catch {} }
+  m = s.match(/^[a-z][a-z0-9+.-]*:\/\/(.*)$/i);
+  if (m) {
+    let rest = m[1].split("#")[0].split("?")[0].replace(/\/+$/, "");
+    if (/^ss:/i.test(s) && !rest.includes("@")) { try { rest = b64decode(rest); } catch {} }
+    const at = rest.lastIndexOf("@");
+    if (at >= 0) rest = rest.slice(at + 1);
+    rest = rest.split("/")[0];
+    try { rest = decodeURIComponent(rest); } catch {}
+    return stripPort(rest);
+  }
+  return stripPort(s);
+}
+/** Имя из ссылки: #фрагмент или поле ps у vmess. */
+function linkName(raw) {
+  const s = (raw || "").trim();
+  const m = s.match(/^vmess:\/\/([^#]+)/i);
+  if (m) { try { const j = JSON.parse(b64decode(m[1])); if (j.ps) return String(j.ps).trim(); } catch {} }
+  const i = s.indexOf("#");
+  if (i < 0 || !/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return "";
+  try { return decodeURIComponent(s.slice(i + 1)).trim(); } catch { return s.slice(i + 1).trim(); }
+}
+const displayName = (srv) => srv.label.trim() || linkName(srv.target) || extractHost(srv.target) || "Без названия";
+function fmtTime(ts) {
+  return new Date(ts).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+function relTime(ts) {
+  if (!ts) return "";
+  const min = Math.floor((Date.now() - ts) / 60000);
+  if (min < 1) return "только что";
+  if (min < 60) return `${min} мин назад`;
+  if (min < 24 * 60) return `${Math.floor(min / 60)} ч назад`;
+  return fmtTime(ts);
+}
+let toastTimer = null;
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+const srvById = (id) => state.servers.find(s => s.id === id);
+
+// ---------- сохранение ----------
+let saveTimer = null;
+function setSaveState(text) { $("#saveState").textContent = text; }
+async function doSave() {
+  const json = JSON.stringify(state);
+  try { localStorage.setItem("cheburcheck-multi", json); } catch {}
+  try {
+    const r = await fetch("/api/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: json });
+    if (!r.ok) throw new Error();
+    setSaveState(`сохранено ${new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`);
+    return true;
+  } catch {
+    setSaveState("не удалось сохранить");
+    return false;
+  }
+}
+// автосохранение, чтобы список не терялся при обновлении страницы
+function save(now) {
+  clearTimeout(saveTimer);
+  setSaveState("есть изменения…");
+  if (now) return doSave();
+  saveTimer = setTimeout(doSave, 600);
+}
+function normalizeResults(results) {
+  // незавершённые проверки после перезагрузки помечаем как прерванные
+  for (const r of Object.values(results)) {
+    if (r && (r.status === "loading" || r.status === "probing")) {
+      r.status = r.check ? "done" : "error"; r.interrupted = true; delete r.waiting;
+      if (!r.check) r.error = "Проверка прервана";
+    }
+  }
+  return results;
+}
+async function load() {
+  let s = null;
+  try { const r = await fetch("/api/state", { cache: "no-store" }); if (r.ok) s = await r.json(); } catch {}
+  if (!s || !(s.servers || s.rows)) { try { s = JSON.parse(localStorage.getItem("cheburcheck-multi") || "null"); } catch {} }
+  if (s && Array.isArray(s.servers)) {
+    state.servers = s.servers.map(x => ({ id: String(x.id || newId()), label: String(x.label || ""), target: String(x.target || "") }));
+    state.results = normalizeResults(s.results && typeof s.results === "object" ? s.results : {});
+    state.selected = s.selected;
+    // тема из state.json главнее браузерной: так она одна и та же в любом браузере
+    if (s.theme && (s.theme === "auto" || THEMES[s.theme])) setTheme(s.theme, true);
+  } else if (s && Array.isArray(s.rows)) {
+    // старый формат (строки + счётчик): результаты были по индексу
+    const count = Math.max(1, parseInt(s.count) || s.rows.length);
+    const old = s.results || {};
+    state.servers = s.rows.slice(0, count).map((r, i) => {
+      const id = newId();
+      if (old[i]) state.results[id] = old[i];
+      return { id, label: String(r?.label || ""), target: String(r?.target || "") };
+    });
+    normalizeResults(state.results);
+  }
+  if (!s) state.servers = Array.from({ length: DEFAULT_SLOTS }, () => ({ id: newId(), label: "", target: "" }));
+  if (!srvById(state.selected)) state.selected = state.servers[0]?.id ?? null;
+  setSaveState(s ? "загружено" : "");
+}
+
+// ---------- логика вердикта (как на сайте, frontend/src/lib/api/probe.ts) ----------
+function probeVerdicts(p, hasCdn) {
+  return (p.verdicts || []).map(v => (hasCdn && !p.cdn_unblocked && (p.host_results?.length ?? 0) !== 0 && v === "ok") ? "cdn_block" : v);
+}
+function primaryVerdict(p, hasCdn) {
+  const vs = probeVerdicts(p, hasCdn);
+  return PRIORITY.find(v => vs.includes(v)) || null;
+}
+function aggregate(probes, hasCdn) {
+  const counts = {};
+  for (const p of probes) { const v = primaryVerdict(p, hasCdn); if (v) counts[v] = (counts[v] || 0) + 1; }
+  let best = null, max = 0;
+  for (const v of PRIORITY) { if ((counts[v] || 0) > max) { best = v; max = counts[v]; } }
+  return { counts, verdict: best === "uncertain" ? null : best };
+}
+/** Сводка по серверу для плитки, списка и счётчиков. */
+function summarize(srv) {
+  const r = state.results[srv.id];
+  const host = extractHost(srv.target);
+  if (!host) return { kind: "empty", cls: "empty", text: "адрес не задан" };
+  if (!r) return { kind: "new", cls: "", text: "не проверялся" };
+  if (r.status === "loading") return { kind: "busy", cls: "", text: "запрос…" };
+  if (!r.check) return { kind: "error", cls: "", text: "ошибка", sub: r.error };
+  const c = r.check;
+  const hasCdn = Object.keys(c.cdn_providers || {}).length > 0;
+  const agg = aggregate(r.probes || [], hasCdn);
+  const total = (r.probes || []).length;
+  const base = { r, c, hasCdn, total, ...agg };
+  if (r.status === "probing") return { ...base, kind: "busy", cls: "", text: r.waiting ? "в очереди (лимит сайта)" : "сканирование" };
+  if (agg.verdict) return { ...base, kind: "done", cls: VERDICTS[agg.verdict].cls, text: VERDICTS[agg.verdict].text };
+  if (c.blocked) return { ...base, kind: "done", cls: "red", text: "В списках блокировок" };
+  if (total) return { ...base, kind: "done", cls: "gray", text: "Неясно" };
+  return { ...base, kind: "done", cls: "green", text: "Не найден в списках" };
+}
+function barHtml(counts, total) {
+  if (!total) return `<div class="bar"></div>`;
+  return `<div class="bar">` + PRIORITY.filter(v => counts[v]).map(v =>
+    `<span style="width:${(counts[v] / total * 100).toFixed(2)}%;background:${BAR_COLORS[VERDICTS[v].cls]}" title="${VERDICTS[v].text}: ${counts[v]}"></span>`).join("") + `</div>`;
+}
+
+// ---------- плитки ----------
+function renderTiles() {
+  const box = $("#tiles");
+  box.innerHTML = state.servers.map(srv => {
+    const s = summarize(srv);
+    const sel = srv.id === state.selected ? " sel" : "";
+    if (s.kind === "empty") {
+      return `<button class="tile t-empty${sel}" data-id="${srv.id}"><div class="top"><span class="nm">${esc(displayName(srv))}</span></div>
+        <div class="vd c-gray">адрес не задан</div><div class="sm">нажмите, чтобы вставить ссылку</div></button>`;
+    }
+    const country = s.c ? (s.c.geo?.location && s.c.geo.location !== "-" ? s.c.geo.location : (s.c.geo?.country_code || "")) : "";
+    const vdCls = s.cls ? `c-${s.cls}` : "c-gray";
+    const spin = s.kind === "busy" ? `<span class="spin"></span>` : "";
+    let sm = "";
+    if (s.kind === "busy" && s.r?.status === "probing") sm = `${s.total}/${s.r.online || "?"} проб · сейчас`;
+    else if (s.kind === "done") {
+      const probes = s.total ? `${s.verdict ? (s.counts[s.verdict] || 0) : s.total}/${s.r.online || s.total} проб` : "без проб";
+      sm = `${probes} · ${relTime(s.r.ts)}${s.c.blocked ? ' · <span class="c-red">в реестре</span>' : ""}`;
+    } else if (s.kind === "error") sm = esc(s.sub || "");
+    else if (s.kind === "new") sm = esc(extractHost(srv.target));
+    return `<button class="tile${s.cls && s.cls !== "gray" ? " t-" + s.cls : ""}${sel}" data-id="${srv.id}">
+      <div class="top"><span class="nm">${esc(displayName(srv))}</span><span class="cn">${esc(country)}</span></div>
+      <div class="vd ${vdCls}">${spin}${esc(s.text)}</div>
+      ${s.total || s.kind === "busy" ? barHtml(s.counts || {}, Math.max(s.r?.online || 0, s.total || 0)) : ""}
+      <div class="sm">${sm}</div></button>`;
+  }).join("") + `<button class="tile add" id="addTile">+ добавить адрес</button>`;
+  renderSummary();
+}
+
+function renderSummary() {
+  let ok = 0, bad = 0, busy = 0;
+  for (const srv of state.servers) {
+    const s = summarize(srv);
+    if (s.kind === "busy") busy++;
+    else if (s.kind === "done" && s.cls === "green") ok++;
+    else if (s.kind === "done" && (s.cls === "red" || s.cls === "amber")) bad++;
+  }
+  const p = [];
+  if (ok) p.push(`<span class="badge b-green">доступны: ${ok}</span>`);
+  if (bad) p.push(`<span class="badge b-red">блокируются: ${bad}</span>`);
+  if (busy) p.push(`<span class="badge b-gray"><span class="spin"></span> проверяется: ${busy}</span>`);
+  $("#summary").innerHTML = p.join("");
+}
+
+// ---------- панель деталей ----------
+function renderDetail() {
+  const box = $("#detail");
+  const srv = srvById(state.selected);
+  if (!srv) {
+    box.innerHTML = `<div class="empty">Серверов нет. Нажмите «+ добавить адрес» или «Импортировать».</div>`;
+    return;
+  }
+  const options = state.servers.map(s => {
+    const sum = summarize(s);
+    const mark = sum.kind === "done" ? ` · ${sum.text}` : sum.kind === "busy" ? " · …" : "";
+    return `<option value="${s.id}"${s.id === srv.id ? " selected" : ""}>${esc(displayName(s))}${esc(mark)}</option>`;
+  }).join("") + `<option value="__new">+ новый адрес</option>`;
+  box.innerHTML = `
+    <div class="edit">
+      <select id="srvSelect" title="Выбрать сервер">${options}</select>
+      <button class="ghost icon" id="renameBtn" title="Переименовать">✎</button>
+      <input type="text" class="link" id="linkInput" placeholder="IP, домен или ссылка vless://…" spellcheck="false" value="${esc(srv.target)}">
+      <button id="goBtn"></button>
+      <button class="ghost" id="delBtn">Удалить</button>
+    </div>
+    <div class="hint" id="hostHint"></div>
+    <div class="body" id="detailBody"></div>`;
+  $("#srvSelect").addEventListener("change", e => {
+    if (e.target.value === "__new") addServer(); else select(e.target.value);
+  });
+  $("#renameBtn").onclick = () => renameServer(srv.id);
+  const input = $("#linkInput");
+  input.addEventListener("input", () => { srv.target = input.value; updateHint(); renderTiles(); renderDetailBody(); save(); });
+  input.addEventListener("keydown", e => { if (e.key === "Enter") runCheck(srv.id); });
+  $("#goBtn").onclick = () => running[srv.id] ? stopCheck(srv.id) : runCheck(srv.id);
+  $("#delBtn").onclick = () => deleteServer(srv.id);
+  updateHint();
+  renderDetailBody();
+}
+function updateHint() {
+  const srv = srvById(state.selected); if (!srv) return;
+  const raw = srv.target.trim(), host = extractHost(raw);
+  $("#hostHint").textContent = host && host !== raw ? `→ проверяется: ${host}` : "";
+  $("#hostHint").style.display = host && host !== raw ? "" : "none";
+}
+function updateSelectLabels() {
+  const sel = $("#srvSelect"); if (!sel) return;
+  for (const opt of sel.options) {
+    const s = srvById(opt.value); if (!s) continue;
+    const sum = summarize(s);
+    opt.textContent = displayName(s) + (sum.kind === "done" ? ` · ${sum.text}` : sum.kind === "busy" ? " · …" : "");
+  }
+}
+
+function renderDetailBody() {
+  const srv = srvById(state.selected); if (!srv) return;
+  const box = $("#detailBody"), btn = $("#goBtn");
+  const host = extractHost(srv.target);
+  btn.textContent = running[srv.id] ? "Стоп" : "Проверить";
+  btn.disabled = !running[srv.id] && !host;
+  updateSelectLabels();
+  const r = state.results[srv.id];
+  if (!r) { box.innerHTML = `<div class="empty">${host ? "Нажмите «Проверить» или Enter." : "Вставьте ссылку на сервер (vless://, trojan://, ss://…), IP или домен."}</div>`; return; }
+  const stale = r.target && host && r.target !== host && !running[srv.id]
+    ? ` <span class="c-amber">(результат для ${esc(r.target)} — адрес изменён)</span>` : "";
+  if (r.status === "loading") { box.innerHTML = `<span class="spin"></span> Запрос к cheburcheck.ru…`; return; }
+  if (!r.check) { box.innerHTML = `<div class="err">Ошибка: ${esc(r.error || "неизвестно")}</div>${stale}`; return; }
+
+  const s = summarize(srv), c = s.c;
+  let head;
+  if (s.verdict) { const V = VERDICTS[s.verdict]; head = `<span class="headline c-${V.cls}">${V.title}</span><span class="muted">${esc(V.sub)}</span>`; }
+  else if (r.status === "probing") head = `<span class="headline c-gray">${r.waiting ? "Ожидание очереди…" : "Сканирование…"}</span>`;
+  else if (c.blocked) head = `<span class="headline c-red">В списках блокировок</span>`;
+  else head = `<span class="headline c-green">Не найден в списках</span>`;
+
+  const badges = [];
+  badges.push(c.blocked
+    ? `<span class="badge b-red">Реестр/списки: найден${c.rkn_domain ? " (" + esc(c.rkn_domain) + ")" : ""}</span>`
+    : `<span class="badge b-green">Реестр/списки: нет</span>`);
+  if (s.hasCdn) badges.push(`<span class="badge b-amber">CDN: ${esc(Object.keys(c.cdn_providers).join(", "))}</span>`);
+  if (c.whitelist) badges.push(`<span class="badge b-amber">Белый список CDN</span>`);
+  for (const v of PRIORITY) if (s.counts[v]) badges.push(`<span class="badge b-${VERDICTS[v].cls}">${VERDICTS[v].text}: ${s.counts[v]}</span>`);
+  if (r.status === "probing" && r.waiting) badges.push(`<span class="badge b-amber"><span class="spin"></span> очередь: лимит сайта 5 запусков проб/мин</span>`);
+  else if (r.status === "probing") badges.push(`<span class="badge b-gray"><span class="spin"></span> пробы ${s.total}/${r.online || "?"}</span>`);
+  if (r.probeError) badges.push(`<span class="badge b-gray">${esc(r.probeError)}</span>`);
+
+  const geo = c.geo || {}, ips = c.ips || [];
+  const meta = [
+    ["Ссылка", srv.target.length > 90 ? srv.target.slice(0, 90) + "…" : srv.target],
+    ["Хост", `${r.target}${c.target_type ? " (" + c.target_type + ")" : ""}`],
+    ["ASN / сеть", [geo.asn, geo.organisation].filter(Boolean).join(" · ")],
+    ["Страна", geo.location && geo.location !== "-" ? geo.location : geo.country_code],
+    ["IP", ips.length > 4 ? ips.slice(0, 4).join(", ") + ` … (всего ${c.ips_total || ips.length})` : ips.join(", ")],
+    ["rDNS", (c.reverse_lookup || []).join(", ")],
+    ["CDN-сети", Object.values(c.cdn_providers || {}).flat().map(n => n.cidr).join(", ")],
+    ["Заблок. подсети", (c.blocked_subnets || []).join(", ")],
+    ["Белый список", c.whitelist ? `ранг ${c.whitelist.rank ?? "?"}` : ""],
+    ["Проверено", r.ts ? `${fmtTime(r.ts)} (${relTime(r.ts)})${r.interrupted ? ", прервано" : ""}` : ""],
+  ].filter(([, v]) => v);
+
+  let table = `<div class="muted">${r.status === "probing" ? "Ждём результаты проб…" : "Результатов проб нет."}</div>`;
+  if (s.total) {
+    const sorted = [...r.probes].sort((a, b) => PRIORITY.indexOf(primaryVerdict(a, s.hasCdn)) - PRIORITY.indexOf(primaryVerdict(b, s.hasCdn)));
+    const row = p => {
+      const tags = probeVerdicts(p, s.hasCdn).map(v => { const V = VERDICTS[v] || { text: v, cls: "gray" }; return `<span class="c-${V.cls}">${esc(V.text)}</span>`; }).join(", ");
+      const hop = p.dpi_hop != null ? `DPI на ${p.dpi_hop}-м хопе` : (p.target_hop != null ? `${p.target_hop} хопа` : "—");
+      return `<tr><td>${tags}</td><td>${esc(p.provider)}</td><td class="muted hide-m">${esc(p.asn)}</td><td>${esc(p.region)}</td><td class="muted hide-m">${esc(hop)}</td></tr>`;
+    };
+    const LIMIT = 8;
+    const showAll = r.open || sorted.length <= LIMIT;
+    table = `<table><thead><tr><th>Вердикт</th><th>Оператор</th><th class="hide-m">ASN</th><th>Регион</th><th class="hide-m">Трассировка</th></tr></thead>
+      <tbody>${(showAll ? sorted : sorted.slice(0, LIMIT)).map(row).join("")}</tbody></table>
+      ${sorted.length > LIMIT ? `<div class="more"><button class="ghost" id="moreBtn">${showAll ? "Свернуть" : `Показать все (${sorted.length})`}</button></div>` : ""}`;
+  }
+
+  box.innerHTML = `
+    <div class="head">${head}${stale}</div>
+    <div class="badges">${badges.join("")}</div>
+    ${barHtml(s.counts, Math.max(r.online || 0, s.total))}
+    <div class="cols">
+      <dl class="meta">${meta.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}
+        <dt>Сайт</dt><dd><a href="https://cheburcheck.ru/check?target=${encodeURIComponent(r.target)}" target="_blank" rel="noopener">открыть на cheburcheck.ru ↗</a></dd></dl>
+      <div>${table}</div>
+    </div>`;
+  const more = $("#moreBtn", box);
+  if (more) more.onclick = () => { r.open = !r.open; renderDetailBody(); save(); };
+}
+
+// ---------- действия с серверами ----------
+function select(id) {
+  if (!srvById(id)) return;
+  state.selected = id;
+  renderTiles();
+  renderDetail();
+  save();
+  const d = $("#detail").getBoundingClientRect();
+  if (d.top > innerHeight - 120) $("#detail").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function addServer() {
+  const srv = { id: newId(), label: "", target: "" };
+  state.servers.push(srv);
+  select(srv.id);
+  $("#linkInput")?.focus();
+}
+function renameServer(id) {
+  const srv = srvById(id); if (!srv) return;
+  const name = prompt("Название сервера (пусто — брать из ссылки):", srv.label || displayName(srv));
+  if (name === null) return;
+  srv.label = name.trim() === linkName(srv.target) ? "" : name.trim();
+  renderTiles(); updateSelectLabels(); save();
+}
+function deleteServer(id) {
+  const srv = srvById(id); if (!srv) return;
+  if (srv.target.trim() && !confirm(`Удалить «${displayName(srv)}»?`)) return;
+  stopCheck(id, true);
+  const idx = state.servers.indexOf(srv);
+  state.servers.splice(idx, 1);
+  delete state.results[id];
+  state.selected = (state.servers[idx] || state.servers[idx - 1])?.id ?? null;
+  renderTiles(); renderDetail(); save();
+}
+function refresh(id) {
+  renderTiles();
+  if (id === state.selected) renderDetailBody();
+}
+let renderPending = {};
+function scheduleRender(id) {
+  if (renderPending[id]) return;
+  renderPending[id] = true;
+  requestAnimationFrame(() => { renderPending[id] = false; refresh(id); });
+}
+
+// ---------- проверка ----------
+async function runCheck(id) {
+  const srv = srvById(id); if (!srv) return;
+  const host = extractHost(srv.target);
+  if (!host) return;
+  stopCheck(id, true);
+  const ctl = { es: null, done: null };
+  running[id] = ctl;
+  const r = { target: host, status: "loading", ts: Date.now(), probes: [], online: 0, open: state.results[id]?.open };
+  state.results[id] = r;
+  refresh(id);
+  try {
+    const resp = await fetch("/api/check?target=" + encodeURIComponent(host));
+    let j = null; try { j = await resp.json(); } catch {}
+    if (running[id] !== ctl) return;
+    if (!resp.ok || !j || !j.id) throw new Error((j && (j.error || j.info)) || `HTTP ${resp.status}`);
+    // для подсетей API отдаёт все IP — храним только начало, чтобы state.json не раздувался
+    if (Array.isArray(j.ips) && j.ips.length > 50) { j.ips_total = j.ips.length; j.ips = j.ips.slice(0, 50); }
+    delete j.complaints;
+    r.check = j;
+    // для подсетей и ASN сайт пробы не запускает (website/src/api/probe.rs) — не тратим лимит
+    if (/\//.test(host) || /^AS\d+$/i.test(host)) {
+      r.probeError = "для подсетей и ASN сайт пробы не запускает";
+      return;
+    }
+    r.status = "probing";
+    refresh(id);
+    await probe(id, r, ctl);
+  } catch (e) {
+    if (running[id] === ctl) r.error = String(e.message || e);
+  } finally {
+    if (running[id] === ctl) {
+      r.status = r.check ? "done" : "error";
+      delete r.waiting;
+      delete running[id];
+      refresh(id);
+      save();
+    }
+  }
+}
+
+function probe(id, r, ctl) {
+  return new Promise(resolve => {
+    const es = new EventSource("/api/probe/" + encodeURIComponent(r.check.id));
+    ctl.es = es;
+    let t = null;
+    const finish = (err) => { clearTimeout(t); es.close(); delete r.waiting; if (err && !r.probes.length) r.probeError = err; resolve(); };
+    ctl.done = finish;
+    // свои события прокси: ожидание лимита сайта (5 запусков проб в минуту) и отказ в пробах
+    es.addEventListener("wait", () => { r.waiting = true; scheduleRender(id); });
+    es.addEventListener("unavailable", e => { let why = "пробы недоступны"; try { why = JSON.parse(e.data).reason || why; } catch {} finish(why); });
+    es.addEventListener("started", e => {
+      delete r.waiting;
+      try { r.online = JSON.parse(e.data).online_probes || 0; } catch {}
+      t = setTimeout(() => finish("таймаут проб"), PROBE_TIMEOUT);
+      scheduleRender(id);
+    });
+    es.addEventListener("result", e => {
+      try {
+        const p = JSON.parse(e.data);
+        // сырые DNS/HTTP-ответы не показываем; для вердикта важна только длина host_results
+        if (Array.isArray(p.host_results)) p.host_results = p.host_results.map(() => 0);
+        delete p.dns;
+        const k = r.probes.findIndex(x => x.probe_id === p.probe_id);
+        if (k >= 0) r.probes[k] = p; else r.probes.push(p);
+      } catch {}
+      scheduleRender(id);
+    });
+    es.addEventListener("done", e => { try { const d = JSON.parse(e.data); if (d.online_probes) r.online = d.online_probes; } catch {} finish(); });
+    es.onerror = () => finish(r.probes.length ? null : "пробы недоступны");
+  });
+}
+
+function stopCheck(id, silent) {
+  const ctl = running[id];
+  if (!ctl) return;
+  delete running[id];
+  if (ctl.es) ctl.es.close();
+  if (ctl.done) ctl.done();
+  const r = state.results[id];
+  if (r && r.status !== "done") { r.status = r.check ? "done" : "error"; if (!r.check) r.error = "Остановлено"; r.interrupted = true; delete r.waiting; }
+  if (!silent) { refresh(id); save(); }
+}
+
+async function checkAll() {
+  queueAbort = false;
+  const btn = $("#checkAll");
+  btn.disabled = true;
+  const ids = state.servers.filter(s => extractHost(s.target)).map(s => s.id);
+  let pos = 0;
+  const worker = async () => {
+    while (!queueAbort && pos < ids.length) await runCheck(ids[pos++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(PARALLEL, ids.length) }, worker));
+  btn.disabled = false;
+}
+
+// ---------- экспорт / импорт ----------
+function exportServers() {
+  const list = state.servers.filter(s => s.target.trim() || s.label.trim());
+  if (!list.length) return toast("Нечего экспортировать — список пуст");
+  const data = { app: "cheburcheck-multi", version: 1, exported: new Date().toISOString(),
+                 servers: list.map(s => ({ name: s.label, link: s.target })) };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  const d = new Date(), pad = n => String(n).padStart(2, "0");
+  a.download = `cheburcheck-servers-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast(`Экспортировано серверов: ${list.length}`);
+}
+/** Понимает: наш экспорт (.json), state.json, JSON-массив ссылок, список ссылок по строке, base64-подписку. */
+function parseImport(text) {
+  text = text.replace(/^﻿/, "").trim();
+  try {
+    const j = JSON.parse(text);
+    const arr = Array.isArray(j) ? j : (j.servers || j.rows || []);
+    return arr.map(x => typeof x === "string" ? { label: "", target: x }
+      : { label: String(x.name ?? x.label ?? ""), target: String(x.link ?? x.target ?? "") }).filter(x => x.target.trim() || x.label.trim());
+  } catch {}
+  if (!/:\/\/|\s/.test(text) && /^[A-Za-z0-9+/=_-]+$/.test(text)) { try { text = b64decode(text); } catch {} }
+  return text.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith("#") && !l.startsWith("//")).map(l => ({ label: "", target: l }));
+}
+async function importFile(file) {
+  let items;
+  try { items = parseImport(await file.text()); } catch { items = []; }
+  if (!items.length) return toast("В файле не найдено адресов");
+  const filled = state.servers.filter(s => s.target.trim());
+  let replace = true;
+  if (filled.length) replace = confirm(`Найдено адресов: ${items.length}.\n\nОК — заменить текущий список (${filled.length})\nОтмена — добавить к нему`);
+  if (replace) {
+    for (const id of Object.keys(running)) stopCheck(id, true);
+    state.servers = []; state.results = {};
+  } else {
+    state.servers = state.servers.filter(s => s.target.trim() || s.label.trim());  // пустые слоты не нужны
+  }
+  for (const it of items) state.servers.push({ id: newId(), label: it.label, target: it.target });
+  state.selected = state.servers[replace ? 0 : state.servers.length - items.length]?.id ?? null;
+  renderTiles(); renderDetail(); save(true);
+  toast(`Импортировано адресов: ${items.length}`);
+}
+
+// ---------- темы ----------
+function currentTheme() {
+  try { return localStorage.getItem("cheburcheck-theme") || "auto"; } catch { return state.theme || "auto"; }
+}
+function setTheme(id, silent) {
+  applyTheme(id);
+  state.theme = id;
+  try { localStorage.setItem("cheburcheck-theme", id); } catch {}
+  renderThemePop();
+  if (!silent) { save(); toast(`Тема: ${id === "auto" ? "авто" : THEMES[id].name}`); }
+}
+function swatch(c) {
+  return `<span class="sw" style="background:${c.bg}">
+    <span class="pn" style="background:${c.panel};border:1px solid ${c.border}">
+      <span class="ln" style="background:${c.text}"></span>
+      <span class="dots"><i style="background:${c.green}"></i><i style="background:${c.red}"></i><i style="background:${c.amber}"></i></span>
+    </span><span class="ac" style="background:${c.accent}"></span></span>`;
+}
+function renderThemePop() {
+  const cur = currentTheme();
+  const half = (a, b) => `linear-gradient(135deg, ${a} 50%, ${b} 50%)`;
+  $("#themePop").innerHTML = `<div class="ttl">Тема оформления</div>
+    <button class="th auto${cur === "auto" ? " on" : ""}" data-theme="auto">
+      <span class="sw" style="width:70px;background:${half(THEMES.dark.c.bg, THEMES.light.c.bg)}"></span>
+      <span>Авто<br><span class="muted">тёмная или светлая, как в системе</span></span></button>` +
+    Object.entries(THEMES).map(([id, t]) =>
+      `<button class="th${cur === id ? " on" : ""}" data-theme="${id}">${swatch(t.c)}<span>${esc(t.name)}</span></button>`).join("");
+}
+$("#themeBtn").onclick = (e) => { e.stopPropagation(); renderThemePop(); $("#themePop").classList.toggle("open"); };
+$("#themePop").addEventListener("click", e => {
+  e.stopPropagation();
+  const b = e.target.closest("[data-theme]");
+  if (b) setTheme(b.dataset.theme);
+});
+document.addEventListener("click", () => $("#themePop").classList.remove("open"));
+addEventListener("keydown", e => { if (e.key === "Escape") $("#themePop").classList.remove("open"); });
+
+// ---------- кнопки ----------
+$("#tiles").addEventListener("click", e => {
+  if (e.target.closest("#addTile")) return addServer();
+  const t = e.target.closest(".tile[data-id]");
+  if (t) select(t.dataset.id);
+});
+$("#saveBtn").onclick = async () => { if (await save(true)) toast("Сохранено в state.json"); else toast("Не удалось сохранить: сервер не отвечает"); };
+$("#exportBtn").onclick = exportServers;
+$("#importBtn").onclick = () => $("#importFile").click();
+$("#importFile").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) importFile(f); });
+$("#checkAll").onclick = checkAll;
+$("#stopAll").onclick = () => { queueAbort = true; for (const id of Object.keys(running)) stopCheck(id); };
+addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); $("#saveBtn").click(); } });
+addEventListener("beforeunload", () => {
+  try { localStorage.setItem("cheburcheck-multi", JSON.stringify(state)); } catch {}
+  try { navigator.sendBeacon("/api/state", new Blob([JSON.stringify(state)], { type: "application/json" })); } catch {}
+});
+setInterval(() => { if (!Object.keys(running).length) renderTiles(); }, 30000);  // «N мин назад»
+
+load().then(() => { renderTiles(); renderDetail(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# личные данные: список серверов и результаты проверок
+state.json
+state.json.tmp
+cheburcheck-servers-*.json
+
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

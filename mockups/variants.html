@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cheburcheck — варианты интерфейса</title>
+<style>
+  :root {
+    --bg: #0a0a0a; --panel: #121212; --panel2: #181818; --border: #262626; --border2: #404040;
+    --text: #d4d4d4; --muted: #737373; --strong: #fafafa;
+    --red: #ef4444; --red-bg: rgba(239,68,68,.12); --red-bd: rgba(239,68,68,.3);
+    --green: #22c55e; --green-bg: rgba(34,197,94,.12); --green-bd: rgba(34,197,94,.3);
+    --amber: #f59e0b; --amber-bg: rgba(245,158,11,.12); --amber-bd: rgba(245,158,11,.3);
+    --gray-bg: rgba(115,115,115,.14);
+    --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Consolas, "DejaVu Sans Mono", monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #fafafa; --panel: #fff; --panel2: #f5f5f5; --border: #e5e5e5; --border2: #a3a3a3;
+            --text: #262626; --muted: #737373; --strong: #0a0a0a; --red: #dc2626; --green: #16a34a; --amber: #d97706; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.5 var(--mono); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px 64px; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { background: var(--panel2); border: 1px solid var(--border2); color: var(--strong); padding: 7px 12px; cursor: pointer;
+           text-transform: uppercase; font-size: 11px; font-weight: bold; }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--strong); color: var(--bg); border-color: var(--strong); }
+  button.ghost { background: transparent; border-color: var(--border); color: var(--muted); }
+  input[type=text], select, textarea { background: var(--panel2); border: 1px solid var(--border); padding: 7px 9px; outline: none; }
+  input[type=text]:focus, textarea:focus { border-color: var(--border2); }
+  a { color: var(--muted); }
+
+  /* демо-переключатель вариантов */
+  .switcher { position: sticky; top: 0; z-index: 10; background: var(--bg); border-bottom: 1px dashed var(--border2); padding: 10px 0; margin-bottom: 20px; }
+  .switcher .wrap { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding-bottom: 0; }
+  .switcher .tag { color: var(--muted); font-size: 11px; margin-right: 6px; }
+  .switcher button.on { background: var(--strong); color: var(--bg); }
+
+  header.app { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;
+               border-bottom: 1px solid var(--border); padding-bottom: 14px; margin-bottom: 16px; }
+  h1 { margin: 0; font-size: 20px; color: var(--strong); text-transform: uppercase; letter-spacing: -.02em; }
+  h1 small { font-size: 11px; color: var(--muted); font-weight: normal; text-transform: none; margin-left: 8px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .counter { display: inline-flex; align-items: center; border: 1px solid var(--border2); }
+  .counter button { border: 0; padding: 7px 11px; }
+  .counter span { padding: 0 12px; border-left: 1px solid var(--border); border-right: 1px solid var(--border); line-height: 30px; }
+  .label { font-size: 11px; color: var(--muted); }
+  .desc { color: var(--muted); font-size: 12px; margin: -6px 0 16px; }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; font-size: 11px; border: 1px solid transparent; white-space: nowrap; }
+  .b-red { color: var(--red); background: var(--red-bg); border-color: var(--red-bd); }
+  .b-green { color: var(--green); background: var(--green-bg); border-color: var(--green-bd); }
+  .b-amber { color: var(--amber); background: var(--amber-bg); border-color: var(--amber-bd); }
+  .b-gray { color: var(--muted); background: var(--gray-bg); border-color: var(--border); }
+  .c-red { color: var(--red); } .c-green { color: var(--green); } .c-amber { color: var(--amber); } .c-gray { color: var(--muted); }
+  .bar { display: flex; height: 6px; background: var(--border); overflow: hidden; min-width: 60px; }
+  .bar span { display: block; height: 100%; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .spin { display: inline-block; width: 9px; height: 9px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: s .8s linear infinite; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  .muted { color: var(--muted); }
+  .panel { border: 1px solid var(--border); background: var(--panel); }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; margin-bottom: 16px; }
+  .stat { border: 1px solid var(--border); background: var(--panel); padding: 10px 12px; }
+  .stat b { display: block; font-size: 22px; color: var(--strong); }
+  .stat b.c-green { color: var(--green); } .stat b.c-red { color: var(--red); }
+  .stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
+  th { color: var(--muted); font-weight: normal; font-size: 11px; text-transform: uppercase; }
+  .meta { display: grid; grid-template-columns: 120px 1fr; gap: 3px 12px; font-size: 12px; }
+  .meta dt { color: var(--muted); } .meta dd { margin: 0; word-break: break-all; }
+  .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* V1 */
+  .v1 tr.row { cursor: pointer; } .v1 tr.row:hover td { background: var(--panel2); }
+  .v1 tr.open td { background: var(--panel2); }
+  .v1 tr.detail td { background: var(--panel2); padding: 12px 10px 16px 46px; }
+  .v1 .detail-grid { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 20px; }
+  .v1 .detail-grid table td, .v1 .detail-grid table th { padding: 5px 8px; }
+  .v1 td input { width: 100%; background: transparent; border: 1px solid transparent; padding: 4px 6px; }
+  .v1 td input:hover { border-color: var(--border); }
+
+  /* V2 */
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+  .tile { border: 1px solid var(--border); padding: 14px; cursor: pointer; min-height: 132px; display: flex; flex-direction: column; gap: 6px; background: var(--panel); }
+  .tile.t-green { background: var(--green-bg); border-color: var(--green-bd); }
+  .tile.t-red { background: var(--red-bg); border-color: var(--red-bd); }
+  .tile.t-amber { background: var(--amber-bg); border-color: var(--amber-bd); }
+  .tile.sel { outline: 2px solid var(--strong); outline-offset: -2px; }
+  .tile .nm { font-size: 16px; font-weight: bold; color: var(--strong); }
+  .tile .vd { font-size: 14px; font-weight: bold; }
+  .tile .sm { font-size: 11px; color: var(--muted); margin-top: auto; }
+  .tile.add { border-style: dashed; align-items: center; justify-content: center; color: var(--muted); background: transparent; }
+
+  /* V3 */
+  .md { display: grid; grid-template-columns: 280px 1fr; gap: 0; min-height: 620px; }
+  .md .list { border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+  .md .item { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .md .item:hover { background: var(--panel2); }
+  .md .item.sel { background: var(--panel2); box-shadow: inset 3px 0 0 var(--strong); }
+  .md .item .sub { font-size: 11px; color: var(--muted); }
+  .md .detail { padding: 16px 20px; min-width: 0; }
+  .md .detail .hide-m { display: none; }
+  .ops { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 6px; margin: 12px 0 16px; }
+  .op { border: 1px solid var(--border); padding: 8px; font-size: 11px; }
+  .op b { display: block; font-size: 12px; color: var(--strong); margin-bottom: 2px; }
+
+  /* V4 */
+  .mx th, .mx td { text-align: center; padding: 6px; }
+  .mx th:first-child, .mx td:first-child { text-align: left; }
+  .cell { display: block; padding: 8px 4px; border: 1px solid; cursor: pointer; font-size: 11px; }
+  .cell.k-green { background: var(--green-bg); border-color: var(--green-bd); color: var(--green); }
+  .cell.k-red { background: var(--red-bg); border-color: var(--red-bd); color: var(--red); }
+  .cell.k-amber { background: var(--amber-bg); border-color: var(--amber-bd); color: var(--amber); }
+  .cell.k-gray { background: var(--gray-bg); border-color: var(--border); color: var(--muted); }
+  .cell.sel { outline: 2px solid var(--strong); outline-offset: 1px; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 10px; }
+
+  /* V5 */
+  .bulk { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; }
+  .bulk textarea { width: 100%; min-height: 420px; resize: vertical; line-height: 1.7; font-size: 12px; white-space: pre; }
+  .res-row { display: grid; grid-template-columns: 24px 90px minmax(0,1fr) 150px 90px; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+
+  /* V6 */
+  .mon-row { display: grid; grid-template-columns: 70px minmax(0,1fr) 110px 150px; gap: 14px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .hist { display: flex; gap: 2px; height: 22px; }
+  .hist i { flex: 1; min-width: 3px; }
+  .h-green { background: var(--green); opacity: .75; } .h-red { background: var(--red); opacity: .8; } .h-amber { background: var(--amber); opacity: .8; } .h-gray { background: var(--border2); }
+  .mon-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; }
+  .log div { padding: 7px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .switch i { width: 30px; height: 16px; background: var(--green); border-radius: 8px; position: relative; }
+  .switch i::after { content: ""; position: absolute; right: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); }
+
+  @media (max-width: 1050px) {
+    .v1 .detail-grid, .detail-2col { grid-template-columns: 1fr !important; }
+  }
+  @media (max-width: 800px) {
+    .stats, .tiles { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .md, .bulk, .mon-grid, .v1 .detail-grid { grid-template-columns: 1fr; }
+    .ops { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .hide-m { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="switcher"><div class="wrap">
+  <span class="tag">ДЕМО · вариант интерфейса:</span>
+  <button data-v="1">1 · Таблица</button>
+  <button data-v="2">2 · Плитки</button>
+  <button data-v="3">3 · Список + детали</button>
+  <button data-v="4">4 · Матрица операторов</button>
+  <button data-v="5">5 · Массовая вставка</button>
+  <button data-v="6">6 · Мониторинг</button>
+</div></div>
+<div class="wrap" id="app"></div>
+
+<script>
+"use strict";
+// ---------- демо-данные ----------
+const OPS = [["МТС","AS8359"],["Билайн","AS8402"],["МегаФон","AS31133"],["Т2","AS15378"],["Ростелеком","AS12389"],["Дом.ру","AS12768"],["Уфанет","AS24955"]];
+const REG = ["Москва","Санкт-Петербург","Владимирская обл.","Костромская обл.","Свердловская обл.","Пермский край","Респ. Башкортостан","Новосибирская обл.","Краснодарский край","Респ. Татарстан"];
+const V = {
+  tspu_block: { t: "ТСПУ блок", c: "red", title: "Заблокирован", sub: "TCP-блокировка на уровне ТСПУ" },
+  sni_block: { t: "SNI блок", c: "red", title: "Заблокирован", sub: "Блокировка по имени домена в SNI" },
+  dns_spoofing: { t: "Подмена DNS", c: "red", title: "Заблокирован", sub: "Подмена ответов DNS" },
+  cdn_block: { t: "CDN 16–20 КБ", c: "amber", title: "Недоступен", sub: "Обрыв после 16–20 КБ (CDN)" },
+  ok: { t: "Доступен", c: "green", title: "Не ограничен", sub: "Ограничений не обнаружено" },
+  uncertain: { t: "Неясно", c: "gray", title: "Неясно", sub: "" },
+};
+const PRI = ["tspu_block","sni_block","dns_spoofing","cdn_block","ok","uncertain"];
+const COL = { red: "var(--red)", green: "var(--green)", amber: "var(--amber)", gray: "var(--border2)" };
+
+const VPNS = [
+  { name: "NL-1", link: "vless://4f1c…@nl1.example.net:443?security=reality#NL-1", host: "nl1.example.net", type: "Домен", asn: "AS60781", org: "LeaseWeb", country: "Нидерланды", reg: false, cdn: "", ago: 4,
+    f: (o, k) => o === 5 ? "uncertain" : "ok", hist: i => "green" },
+  { name: "DE-1", link: "vless://9a2e…@203.0.113.24:443?security=reality#DE-1", host: "203.0.113.24", type: "IPv4-адрес", asn: "AS24940", org: "Hetzner Online", country: "Германия", reg: false, cdn: "", ago: 4,
+    f: (o, k) => [0,2,3,4].includes(o) ? "tspu_block" : o === 5 ? "uncertain" : "ok", hist: i => i < 30 ? "green" : i === 30 ? "amber" : "red" },
+  { name: "FI-1", link: "trojan://pw…@fi.example.org:443#FI-1", host: "fi.example.org", type: "Домен", asn: "AS13335", org: "Cloudflare, Inc.", country: "—", reg: true, cdn: "cloudflare", ago: 5,
+    f: (o, k) => (k === 3 || k === 17) ? "uncertain" : "sni_block", hist: i => "red" },
+  { name: "US-1", link: "ss://YWVzLTI1Ni1nY206…@198.51.100.7:8388#US-1", host: "198.51.100.7", type: "IPv4-адрес", asn: "AS14061", org: "DigitalOcean", country: "США", reg: false, cdn: "", ago: 0, scanning: 12,
+    f: (o, k) => k % 6 === 5 ? "uncertain" : "ok", hist: i => i % 17 === 9 ? "gray" : "green" },
+  { name: "TR-1", link: "hysteria2://pw…@tr.example.com:443/?sni=tr.example.com#TR-1", host: "tr.example.com", type: "Домен", asn: "AS42926", org: "Radore", country: "Турция", reg: false, cdn: "", ago: 5,
+    f: (o, k) => k % 9 === 0 ? "uncertain" : "ok", hist: i => i === 12 ? "gray" : "green" },
+  { name: "KZ-1", link: "vless://c03d…@kz.example.kz:8443?security=tls#KZ-1", host: "kz.example.kz", type: "Домен", asn: "AS9198", org: "JSC Kazakhtelecom", country: "Казахстан", reg: false, cdn: "", ago: 6,
+    f: (o, k) => [1,3,6].includes(o) ? "cdn_block" : "ok", hist: i => [5,11,19,26,33,40,44].includes(i) ? "amber" : i === 22 ? "gray" : "green" },
+  { name: "PL-1", link: "vless://77ab…@192.0.2.15:443?security=reality#PL-1", host: "192.0.2.15", type: "IPv4-адрес", asn: "AS16276", org: "OVH SAS", country: "Польша", reg: false, cdn: "", ago: 6,
+    f: (o, k) => "ok", hist: i => "green" },
+  { name: "", link: "", host: "", empty: true },
+];
+for (const v of VPNS) {
+  if (v.empty) continue;
+  const n = v.scanning ?? 28;
+  v.probes = Array.from({ length: n }, (_, k) => {
+    const o = k % 7, vd = v.f(o, k);
+    return { op: OPS[o][0], asn: OPS[o][1], o, region: REG[(k * 3 + o) % 10], v: vd, hop: vd === "tspu_block" ? 1 + (k % 3) : null, th: vd === "uncertain" ? null : 2 + (k % 4) };
+  });
+  v.counts = {}; for (const p of v.probes) v.counts[p.v] = (v.counts[p.v] || 0) + 1;
+  let best = null, max = 0; for (const x of PRI) if ((v.counts[x] || 0) > max) { best = x; max = v.counts[x]; }
+  v.verdict = best === "uncertain" ? null : best;
+  v.history = Array.from({ length: 48 }, (_, i) => v.hist(i));
+}
+const live = VPNS.filter(v => !v.empty);
+
+// ---------- общие куски ----------
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const vc = v => v.scanning ? "gray" : v.verdict ? V[v.verdict].c : "gray";
+function verdictBadge(v) {
+  if (v.empty) return `<span class="badge b-gray">не задан</span>`;
+  if (v.scanning) return `<span class="badge b-gray"><span class="spin"></span> ${v.scanning}/28</span>`;
+  return v.verdict ? `<span class="badge b-${V[v.verdict].c}">${V[v.verdict].t}</span>` : `<span class="badge b-gray">Неясно</span>`;
+}
+const regBadge = v => v.empty ? "" : v.reg ? `<span class="badge b-red">в списках</span>` : `<span class="badge b-green">нет</span>`;
+function bar(v) {
+  if (v.empty) return `<div class="bar"></div>`;
+  return `<div class="bar">` + PRI.filter(x => v.counts[x]).map(x => `<span style="width:${v.counts[x] / 28 * 100}%;background:${COL[V[x].c]}" title="${V[x].t}: ${v.counts[x]}"></span>`).join("") + `</div>`;
+}
+const ago = v => v.empty ? "" : v.scanning ? "сейчас" : `${v.ago} мин назад`;
+function header(sub, tools) {
+  return `<header class="app"><h1>Cheburcheck <small>${sub}</small></h1><div class="toolbar">${tools}</div></header>`;
+}
+const counter = `<span class="label">Адресов:</span><span class="counter"><button>−</button><span>8</span><button>+</button></span>`;
+const mainBtns = `<button class="primary">Проверить все</button><button class="ghost">Стоп</button>`;
+function stats() {
+  const ok = live.filter(v => v.verdict === "ok" && !v.scanning).length;
+  const bad = live.filter(v => !v.scanning && v.verdict && V[v.verdict].c !== "green").length;
+  return `<div class="stats">
+    <div class="stat"><b class="c-green">${ok}</b><span>доступны</span></div>
+    <div class="stat"><b class="c-red">${bad}</b><span>блокируются</span></div>
+    <div class="stat"><b>${live.filter(v => v.scanning).length}</b><span>проверяется</span></div>
+    <div class="stat"><b>28</b><span>проб онлайн</span></div></div>`;
+}
+function metaList(v) {
+  return `<dl class="meta">
+    <dt>Ссылка</dt><dd class="muted">${esc(v.link)}</dd>
+    <dt>Хост</dt><dd>${esc(v.host)} <span class="muted">(${v.type})</span></dd>
+    <dt>ASN / сеть</dt><dd>${v.asn} · ${esc(v.org)}</dd>
+    <dt>Страна</dt><dd>${v.country}</dd>
+    <dt>Реестр / списки</dt><dd>${v.reg ? '<span class="c-red">найден</span>' : '<span class="c-green">не найден</span>'}</dd>
+    ${v.cdn ? `<dt>CDN</dt><dd class="c-amber">${v.cdn}</dd>` : ""}
+    <dt>Проверено</dt><dd>${ago(v)}</dd>
+    <dt>Сайт</dt><dd><a href="#">открыть на cheburcheck.ru ↗</a></dd></dl>`;
+}
+function probeTable(v, limit) {
+  const rows = [...v.probes].sort((a, b) => PRI.indexOf(a.v) - PRI.indexOf(b.v)).slice(0, limit || 99);
+  return `<table><thead><tr><th>Вердикт</th><th>Оператор</th><th class="hide-m">ASN</th><th>Регион</th><th class="hide-m">Трассировка</th></tr></thead><tbody>` +
+    rows.map(p => `<tr><td><span class="c-${V[p.v].c}">${V[p.v].t}</span></td><td>${p.op}</td><td class="muted hide-m">${p.asn}</td><td>${p.region}</td>
+      <td class="muted hide-m">${p.hop ? `DPI на ${p.hop}-м хопе` : p.th ? `${p.th} хопа` : "—"}</td></tr>`).join("") + `</tbody></table>`;
+}
+function opSummary(v) {
+  return OPS.map(([op], o) => {
+    const ps = v.probes.filter(p => p.o === o);
+    const c = {}; ps.forEach(p => c[p.v] = (c[p.v] || 0) + 1);
+    const top = PRI.find(x => c[x] && x !== "uncertain") || "uncertain";
+    return { op, o, ps, top, n: c[top] || 0, total: ps.length };
+  });
+}
+
+// ---------- вариант 1: таблица ----------
+let v1open = 1;
+function renderV1() {
+  return header("мульти-проверка адресов", counter + mainBtns + `<button class="ghost">Очистить</button>`) +
+    `<p class="desc">Одна строка — один сервер. Название и адрес редактируются прямо в таблице, клик по строке раскрывает подробности.</p>` + stats() +
+    `<div class="panel v1"><table><thead><tr><th style="width:48px">#</th><th style="width:110px">Название</th><th>Адрес / ссылка</th><th style="width:100px">Реестр</th>
+     <th style="width:130px">Вердикт</th><th style="width:150px" class="hide-m">Пробы</th><th style="width:110px" class="hide-m">Проверено</th><th style="width:44px"></th></tr></thead><tbody>` +
+    VPNS.map((v, i) => `
+      <tr class="row ${v1open === i ? "open" : ""}" data-i="${i}"><td class="muted">${v1open === i ? "▾" : "▸"} ${i + 1}</td>
+        <td><input type="text" value="${esc(v.name)}" placeholder="Название"></td>
+        <td><input type="text" value="${esc(v.link)}" placeholder="IP, домен или ссылка vless://…"></td>
+        <td>${regBadge(v)}</td><td>${verdictBadge(v)}</td><td class="hide-m">${bar(v)}</td><td class="muted hide-m">${ago(v)}</td>
+        <td><button class="ghost" title="Перепроверить">${v.scanning ? "■" : "↻"}</button></td></tr>
+      ${v1open === i && !v.empty ? `<tr class="detail"><td colspan="8"><div class="detail-grid"><div>${metaList(v)}</div><div>${probeTable(v, 8)}
+        <div class="muted" style="margin-top:6px">… ещё ${v.probes.length - 8} проб</div></div></div></td></tr>` : ""}`).join("") +
+    `</tbody></table></div>`;
+}
+
+// ---------- вариант 2: плитки ----------
+let v2sel = 1;
+function renderV2() {
+  const s = VPNS[v2sel];
+  return header("обзор серверов", counter + mainBtns) +
+    `<p class="desc">Светофор: цвет плитки = итоговый вердикт. Клик по плитке — подробности и редактирование ниже.</p>` +
+    `<div class="tiles">` + VPNS.map((v, i) => v.empty
+      ? `<div class="tile add" data-i="${i}">+ добавить адрес</div>`
+      : `<div class="tile t-${v.scanning ? "gray" : vc(v)} ${v2sel === i ? "sel" : ""}" data-i="${i}">
+          <div style="display:flex;justify-content:space-between"><span class="nm">${v.name}</span><span class="muted">${v.country}</span></div>
+          <div class="vd c-${vc(v)}">${v.scanning ? '<span class="spin"></span> сканирование' : v.verdict ? V[v.verdict].t : "Неясно"}</div>
+          ${bar(v)}
+          <div class="sm">${v.scanning ? `${v.scanning}/28 проб` : `${v.counts[v.verdict] || 0}/28 проб`} · ${ago(v)}${v.reg ? ' · <span class="c-red">в реестре</span>' : ""}</div></div>`).join("") + `</div>` +
+    (s && !s.empty ? `<div class="panel" style="margin-top:14px;padding:16px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <input type="text" value="${s.name}" style="width:120px"><input type="text" value="${esc(s.link)}" style="flex:1;min-width:200px">
+        <button>Проверить</button><button class="ghost">Удалить</button></div>
+      <div class="detail-2col" style="display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px">${metaList(s)}<div>${probeTable(s, 7)}</div></div></div>` : "");
+}
+
+// ---------- вариант 3: список + детали ----------
+let v3sel = 1;
+function renderV3() {
+  const s = VPNS[v3sel];
+  const ops = s.empty ? [] : opSummary(s);
+  return header("мульти-проверка адресов", mainBtns) +
+    `<p class="desc">Слева — все серверы, справа — разбор выбранного: что сломано и у каких операторов.</p>` +
+    `<div class="panel md"><div class="list">
+      <div style="padding:10px;border-bottom:1px solid var(--border)"><input type="text" placeholder="Поиск…" style="width:100%"></div>` +
+      VPNS.map((v, i) => v.empty ? `<div class="item muted" data-i="${i}">+ добавить адрес</div>` :
+      `<div class="item ${v3sel === i ? "sel" : ""}" data-i="${i}"><span class="dot" style="background:${COL[vc(v)]}"></span>
+        <div style="min-width:0;flex:1"><div>${v.name}</div><div class="sub ell">${esc(v.host)}</div></div>
+        <span class="sub">${v.scanning ? `<span class="spin"></span>` : v.verdict ? V[v.verdict].t : "?"}</span></div>`).join("") +
+      `<div style="margin-top:auto;padding:10px;border-top:1px solid var(--border)" class="label">7 адресов · 2 блокируются</div></div>
+    <div class="detail">` + (s.empty ? `<div class="muted">Пустой слот</div>` : `
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:20px;font-weight:bold;color:var(--strong)">${s.name}</span><span class="muted">${esc(s.host)}</span>
+        <span style="margin-left:auto;display:flex;gap:6px"><button>Перепроверить</button><button class="ghost">Изменить</button></span></div>
+      <div style="margin:10px 0 4px;font-size:16px;font-weight:bold" class="c-${vc(s)}">${s.scanning ? "Сканирование…" : s.verdict ? V[s.verdict].title : "Неясно"}
+        <span class="muted" style="font-size:12px;font-weight:normal;margin-left:8px">${s.verdict ? V[s.verdict].sub : ""}</span></div>
+      ${bar(s)}
+      <div class="label" style="margin-top:16px">ПО ОПЕРАТОРАМ</div>
+      <div class="ops">${ops.map(x => `<div class="op" style="border-color:${x.top === "ok" ? "var(--green-bd)" : x.top === "uncertain" ? "var(--border)" : V[x.top].c === "amber" ? "var(--amber-bd)" : "var(--red-bd)"}">
+        <b>${x.op}</b><span class="c-${V[x.top].c}">${V[x.top].t}</span><br><span class="muted">${x.n}/${x.total}</span></div>`).join("")}</div>
+      <div class="detail-2col" style="display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:20px">${metaList(s)}<div>${probeTable(s, 9)}</div></div>`) +
+    `</div></div>`;
+}
+
+// ---------- вариант 4: матрица ----------
+let v4sel = [1, 0];
+function renderV4() {
+  const [si, so] = v4sel, sv = VPNS[si];
+  const sp = sv && !sv.empty ? sv.probes.filter(p => p.o === so) : [];
+  return header("матрица «сервер × оператор»", counter + mainBtns) +
+    `<p class="desc">Каждая клетка — итог проб данного оператора для сервера (сколько проб из скольких). Клик по клетке — регионы ниже.</p>` + stats() +
+    `<div class="panel" style="padding:12px;overflow-x:auto"><table class="mx"><thead><tr><th>Сервер</th>${OPS.map(o => `<th>${o[0]}</th>`).join("")}<th>Итог</th><th class="hide-m">Реестр</th></tr></thead><tbody>` +
+    live.map(v => {
+      const i = VPNS.indexOf(v), ops = opSummary(v);
+      return `<tr><td><b style="color:var(--strong)">${v.name}</b><br><span class="muted" style="font-size:11px">${esc(v.host)}</span></td>` +
+        OPS.map((_, o) => {
+          const x = ops[o];
+          if (!x.total) return `<td><span class="cell k-gray">…</span></td>`;
+          const k = x.top === "uncertain" ? "gray" : V[x.top].c;
+          return `<td><span class="cell k-${k} ${si === i && so === o ? "sel" : ""}" data-i="${i}" data-o="${o}" title="${x.op}: ${V[x.top].t} ${x.n}/${x.total}">${x.top === "ok" ? "✓" : x.top === "uncertain" ? "?" : "✕"} ${x.n}/${x.total}</span></td>`;
+        }).join("") + `<td>${verdictBadge(v)}</td><td class="hide-m">${regBadge(v)}</td></tr>`;
+    }).join("") + `</tbody></table>
+    <div class="legend"><span><span class="dot" style="background:var(--green)"></span> доступен</span><span><span class="dot" style="background:var(--red)"></span> ТСПУ / SNI / DNS блок</span>
+      <span><span class="dot" style="background:var(--amber)"></span> обрыв CDN 16–20 КБ</span><span><span class="dot" style="background:var(--border2)"></span> неясно / нет данных</span></div></div>` +
+    (sp.length ? `<div class="panel" style="margin-top:14px;padding:14px"><div style="margin-bottom:8px"><b style="color:var(--strong)">${sv.name}</b> × <b style="color:var(--strong)">${OPS[so][0]}</b> <span class="muted">— пробы по регионам</span></div>
+      <table><thead><tr><th>Регион</th><th>Вердикт</th><th>Трассировка</th></tr></thead><tbody>${sp.map(p => `<tr><td>${p.region}</td><td class="c-${V[p.v].c}">${V[p.v].t}</td><td class="muted">${p.hop ? `DPI на ${p.hop}-м хопе` : p.th ? `${p.th} хопа` : "—"}</td></tr>`).join("")}</tbody></table></div>` : "");
+}
+
+// ---------- вариант 5: массовая вставка ----------
+let v5text = live.map(v => v.link).join("\n");
+function parseLine(s) {
+  s = s.trim(); if (!s) return null;
+  const name = decodeURIComponent((s.split("#")[1] || "").trim());
+  let h = s.replace(/^[a-z0-9+.-]+:\/\//i, "").split("#")[0].split("?")[0];
+  if (h.includes("@")) h = h.slice(h.lastIndexOf("@") + 1);
+  h = h.split("/")[0].replace(/:\d+$/, "");
+  return { name, host: h };
+}
+function renderV5() {
+  return header("массовая проверка", `<button class="ghost">Загрузить подписку по URL</button><button class="ghost">Импорт файла</button>`) +
+    `<p class="desc">Вставьте ссылки по одной на строку (или подписку целиком). Количество адресов = количество строк, имена берутся из #фрагмента.</p>` +
+    `<div class="bulk"><div class="panel" style="padding:12px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span class="label">СПИСОК АДРЕСОВ</span><span class="label" id="v5n"></span></div>
+      <textarea id="v5ta" spellcheck="false">${esc(v5text)}</textarea>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="primary" id="v5go"></button><button class="ghost">Стоп</button><button class="ghost">Очистить</button></div></div>
+    <div class="panel"><div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between"><span class="label">РЕЗУЛЬТАТЫ</span>
+      <span class="label">очередь: лимит сайта 5 запусков проб/мин</span></div><div id="v5res"></div></div></div>`;
+}
+function updateV5() {
+  const lines = v5text.split("\n").map(parseLine).filter(Boolean);
+  document.getElementById("v5n").textContent = `${lines.length} адресов`;
+  document.getElementById("v5go").textContent = `Проверить ${lines.length}`;
+  document.getElementById("v5res").innerHTML = lines.map((l, i) => {
+    const known = live.find(v => v.host === l.host);
+    const st = known ? verdictBadge(known) : `<span class="badge b-gray">в очереди</span>`;
+    return `<div class="res-row"><span class="muted">${i + 1}</span><span class="ell" style="color:var(--strong)">${esc(l.name || "—")}</span>
+      <span class="ell muted">${esc(l.host)}</span><span>${known ? bar(known) : '<div class="bar"></div>'}</span><span>${st}</span></div>`;
+  }).join("") || `<div style="padding:16px" class="muted">Вставьте ссылки слева</div>`;
+}
+
+// ---------- вариант 6: мониторинг ----------
+function renderV6() {
+  const log = [
+    ["13.10 14:30", "DE-1", "Доступен → ТСПУ блок", "red"],
+    ["13.10 14:00", "DE-1", "Доступен → Неясно", "gray"],
+    ["13.10 12:30", "KZ-1", "CDN 16–20 КБ → Доступен", "green"],
+    ["13.10 12:00", "KZ-1", "Доступен → CDN 16–20 КБ", "amber"],
+    ["13.10 06:00", "TR-1", "Доступен → Неясно → Доступен", "gray"],
+    ["12.10 23:30", "FI-1", "SNI блок (без изменений 24 ч)", "red"],
+  ];
+  return header("мониторинг", `<label class="label">Автопроверка</label><select><option>каждые 15 мин</option><option selected>каждые 30 мин</option><option>каждый час</option></select>
+      <span class="switch"><i></i><span class="label">уведомления</span></span><button class="primary">Проверить сейчас</button>`) +
+    `<p class="desc">Проверка идёт сама по расписанию, полоса — история за 24 часа (48 проверок). Уведомление в браузере при смене статуса.</p>` +
+    `<div class="stats"><div class="stat"><b class="c-green">5</b><span>доступны сейчас</span></div><div class="stat"><b class="c-red">2</b><span>блокируются</span></div>
+     <div class="stat"><b>12:40</b><span>до след. проверки</span></div><div class="stat"><b>91%</b><span>доступность за 24 ч</span></div></div>` +
+    `<div class="mon-grid"><div class="panel"><div class="mon-row" style="padding-top:8px;padding-bottom:8px"><span class="label">СЕРВЕР</span>
+      <span class="label" style="display:flex;justify-content:space-between"><span>24 ч назад</span><span>сейчас</span></span><span class="label">ДОСТУПНОСТЬ</span><span class="label">СТАТУС</span></div>` +
+      live.map(v => {
+        const up = Math.round(v.history.filter(h => h === "green").length / 48 * 100);
+        return `<div class="mon-row"><span><b style="color:var(--strong)">${v.name}</b><br><span class="muted" style="font-size:11px">${v.country}</span></span>
+          <span class="hist">${v.history.map((h, i) => `<i class="h-${h}" title="${String(Math.floor((i * 30) / 60)).padStart(2, "0")}:${i % 2 ? "30" : "00"}"></i>`).join("")}</span>
+          <span class="c-${up > 95 ? "green" : up > 50 ? "amber" : "red"}" style="font-size:15px;font-weight:bold">${up}%</span>
+          <span>${verdictBadge(v)}${v.name === "DE-1" ? '<br><span class="muted" style="font-size:11px">с 14:30</span>' : ""}</span></div>`;
+      }).join("") + `</div>
+      <div class="panel log"><div class="label" style="padding:10px 12px;border-bottom:1px solid var(--border)">ЖУРНАЛ ИЗМЕНЕНИЙ</div>` +
+      log.map(([t, n, e, c]) => `<div><span class="muted">${t}</span> <b style="color:var(--strong)">${n}</b><br><span class="c-${c}">${e}</span></div>`).join("") + `</div></div>`;
+}
+
+// ---------- переключение ----------
+const R = { 1: renderV1, 2: renderV2, 3: renderV3, 4: renderV4, 5: renderV5, 6: renderV6 };
+let cur = +(location.hash.slice(1)) || 1;
+function show(n) {
+  cur = n; location.hash = n;
+  document.querySelectorAll(".switcher button").forEach(b => b.classList.toggle("on", +b.dataset.v === n));
+  document.getElementById("app").innerHTML = R[n]();
+  if (n === 5) { updateV5(); document.getElementById("v5ta").addEventListener("input", e => { v5text = e.target.value; updateV5(); }); }
+}
+document.querySelectorAll(".switcher button").forEach(b => b.onclick = () => { show(+b.dataset.v); scrollTo(0, 0); });
+document.getElementById("app").addEventListener("click", e => {
+  if (e.target.closest("input,button,a")) return;
+  const row = e.target.closest(".v1 tr.row"); if (row) { const i = +row.dataset.i; v1open = v1open === i ? -1 : i; return show(1); }
+  const tile = e.target.closest(".tile[data-i]"); if (tile) { v2sel = +tile.dataset.i; return show(2); }
+  const item = e.target.closest(".md .item[data-i]"); if (item && !VPNS[+item.dataset.i].empty) { v3sel = +item.dataset.i; return show(3); }
+  const cell = e.target.closest(".cell[data-i]"); if (cell) { v4sel = [+cell.dataset.i, +cell.dataset.o]; return show(4); }
+});
+show(cur);
+</script>
+</body>
+</html>
