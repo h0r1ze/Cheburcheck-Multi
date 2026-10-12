@@ -10,7 +10,9 @@
 Готовая программа для **Windows**, **Linux** и **macOS** — скачал и запустил.
 
 [![Release](https://img.shields.io/github/v/release/h0r1ze/Cheburcheck-Multi?color=22c55e&label=%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F)](https://github.com/h0r1ze/Cheburcheck-Multi/releases/latest)
-[![Windows · Linux · macOS](https://img.shields.io/badge/Windows%20%C2%B7%20Linux%20%C2%B7%20macOS-0a0a0a?logo=windowsterminal&logoColor=white)](#-быстрый-старт)
+[![Windows](https://img.shields.io/badge/Windows-0078D6?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0wIDBoMTF2MTFIMHpNMTMgMGgxMXYxMUgxM3pNMCAxM2gxMXYxMUgwek0xMyAxM2gxMXYxMUgxM3oiLz48L3N2Zz4=)](#-быстрый-старт)
+[![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)](#-быстрый-старт)
+[![macOS](https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white)](#-быстрый-старт)
 [![Python не нужен](https://img.shields.io/badge/Python-%D0%BD%D0%B5%20%D0%BD%D1%83%D0%B6%D0%B5%D0%BD-3776AB?logo=python&logoColor=white)](#-быстрый-старт)
 [![License: MIT](https://img.shields.io/github/license/h0r1ze/Cheburcheck-Multi?color=f59e0b)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/h0r1ze/Cheburcheck-Multi?style=flat&color=ef4444)](https://github.com/h0r1ze/Cheburcheck-Multi/stargazers)
