@@ -15,6 +15,7 @@ Cheburcheck Multi — пакетная проверка адресов (VPN-се
 import argparse
 import json
 import os
+import platform
 import re
 import shlex
 import shutil
@@ -31,7 +32,9 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 APP_ID = "cheburcheck-multi"
-VERSION = "1.5.0"
+VERSION = "1.6.0"
+REPO = "h0r1ze/Cheburcheck-Multi"
+UPDATE_INTERVAL = 24 * 60 * 60   # проверять обновления не чаще раза в сутки
 BASE = "https://cheburcheck.ru"
 UA = "Mozilla/5.0 (cheburcheck-multi; +https://cheburcheck.ru)"
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -84,6 +87,55 @@ def save_settings(**values):
         os.replace(tmp, SETTINGS)
     except OSError:
         pass
+
+
+def version_tuple(v):
+    return tuple(int(x) for x in re.findall(r"\d+", str(v))[:3]) or (0,)
+
+
+def release_asset_name():
+    """Какой файл релиза подходит этой копии программы."""
+    if not FROZEN:
+        return "Cheburcheck-Multi.zip"
+    if sys.platform.startswith("win"):
+        return "Cheburcheck-Multi-Windows-x64.exe"
+    if sys.platform == "darwin":
+        return "Cheburcheck-Multi-macOS-arm64.tar.gz"
+    arm = platform.machine().lower() in ("aarch64", "arm64")
+    return f"Cheburcheck-Multi-Linux-{'arm64' if arm else 'x64'}.tar.gz"
+
+
+update_lock = threading.Lock()
+
+
+def check_update(force=False):
+    """Последний релиз на GitHub против своей версии. Результат кешируется в settings.json,
+    без force запрос к GitHub — не чаще раза в сутки (лимит API без авторизации — 60/час)."""
+    settings = load_settings()
+    enabled = settings.get("update_check", True)
+    result = {"current": VERSION, "enabled": enabled, "dismissed": settings.get("update_dismissed")}
+    with update_lock:
+        cache = settings.get("update_cache") or {}
+        fresh = time.time() - cache.get("checked_at", 0) < UPDATE_INTERVAL
+        if (enabled or force) and (force or not fresh):
+            req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/releases/latest",
+                                         headers={"Accept": "application/vnd.github+json", "User-Agent": UA})
+            try:
+                with urllib.request.urlopen(req, timeout=10, context=SSL_CTX) as r:
+                    rel = json.loads(r.read().decode("utf-8"))
+                name = release_asset_name()
+                asset = next((a["browser_download_url"] for a in rel.get("assets", []) if a.get("name") == name), None)
+                cache = {"latest": rel.get("tag_name", "").lstrip("v"), "page": rel.get("html_url"),
+                         "asset": asset or rel.get("html_url"), "asset_name": name if asset else None,
+                         "checked_at": time.time()}
+                save_settings(update_cache=cache)
+            except (urllib.error.URLError, socket.timeout, OSError, ValueError, KeyError) as e:
+                result["error"] = f"Не удалось проверить обновления: {getattr(e, 'reason', e)}"
+    if cache.get("latest"):
+        result.update(latest=cache["latest"], page=cache.get("page"), asset=cache.get("asset"),
+                      asset_name=cache.get("asset_name"), checked_at=cache.get("checked_at"),
+                      newer=version_tuple(cache["latest"]) > version_tuple(VERSION))
+    return result
 
 
 def app_url(port):
@@ -161,6 +213,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.get_state()
             elif path == "/api/ping":
                 self.send_json(200, {"app": APP_ID, "version": VERSION})
+            elif path == "/api/update":
+                force = urllib.parse.parse_qs(url.query).get("force", [""])[0] == "1"
+                self.send_json(200, check_update(force))
             elif path == "/api/info":
                 port = self.server.server_address[1]
                 self.send_json(200, {"app": APP_ID, "version": VERSION, "port": port, "url": app_url(port),
@@ -193,6 +248,8 @@ class Handler(BaseHTTPRequestHandler):
             print("Остановлено со страницы.", flush=True)
             APP["stop"].set()
             return
+        if path == "/api/settings":
+            return self.change_settings()
         if path == "/api/port":
             return self.change_port()
         if path != "/api/state":
@@ -210,6 +267,23 @@ class Handler(BaseHTTPRequestHandler):
             with open(tmp, "wb") as f:
                 f.write(raw)
             os.replace(tmp, STATE)
+        self.send_json(200, {"ok": True})
+
+    def change_settings(self):
+        """Настройки обновлений: включить/выключить проверку, скрыть уведомление о версии."""
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            data = json.loads(self.rfile.read(length).decode("utf-8")) if 0 < length < 4096 else {}
+        except ValueError:
+            data = {}
+        values = {}
+        if isinstance(data.get("update_check"), bool):
+            values["update_check"] = data["update_check"]
+        if isinstance(data.get("update_dismissed"), str) and len(data["update_dismissed"]) < 32:
+            values["update_dismissed"] = data["update_dismissed"]
+        if not values:
+            return self.send_json(400, {"error": "нечего сохранять"})
+        save_settings(**values)
         self.send_json(200, {"ok": True})
 
     def change_port(self):

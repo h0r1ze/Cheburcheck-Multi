@@ -164,6 +164,10 @@ try { window.applyTheme(localStorage.getItem("cheburcheck-theme") || "auto"); } 
   .set-pop .err { font-size: 12px; margin-top: 8px; }
   .notice { border: 1px solid var(--amber-bd); background: var(--amber-bg); color: var(--amber); padding: 8px 12px; font-size: 12px; margin-bottom: 14px; }
   .notice a { color: inherit; cursor: pointer; }
+  .notice.upd { border-color: var(--green-bd); background: var(--green-bg); color: var(--green); }
+  .notice.upd a { margin-left: 10px; font-weight: bold; }
+  .set-pop hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0 12px; }
+  .set-pop .chk { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--text); cursor: pointer; margin-bottom: 8px; }
   .theme-pop .ttl { grid-column: 1 / -1; font-size: 11px; color: var(--muted); text-transform: uppercase; }
   .th { background: transparent; border: 1px solid var(--border); padding: 6px; color: var(--text); text-transform: none; font-weight: normal;
         font-size: 12px; text-align: left; display: flex; flex-direction: column; gap: 6px; }
@@ -203,6 +207,11 @@ try { window.applyTheme(localStorage.getItem("cheburcheck-theme") || "auto"); } 
         </div>
         <div class="err" id="portErr"></div>
         <div class="note" id="portNote"></div>
+        <hr>
+        <label>Обновления</label>
+        <span class="chk"><input type="checkbox" id="updCheck"> <span>проверять новые версии раз в сутки</span></span>
+        <div class="row"><button id="updNow">Проверить сейчас</button></div>
+        <div class="note" id="updNote"></div>
       </div>
       <span class="theme-wrap">
         <button class="ghost" id="themeBtn" title="Тема оформления" aria-haspopup="true">Тема ▾</button>
@@ -223,6 +232,7 @@ try { window.applyTheme(localStorage.getItem("cheburcheck-theme") || "auto"); } 
     <span>Светофор: цвет плитки = итоговый вердикт. Клик по плитке — подробности ниже, перетаскивание — поменять порядок.</span>
     <span class="summary" id="summary"></span>
   </div>
+  <div class="notice upd" id="updNotice" hidden></div>
   <div class="notice" id="portNotice" hidden></div>
   <div class="tiles" id="tiles"></div>
   <div class="detail" id="detail"></div>
@@ -1000,6 +1010,7 @@ function openSettings() {
   $("#themePop").classList.remove("open");
   $("#settingsPop").classList.add("open");
   loadInfo().then(fillSettings);
+  loadUpdate(false);
   setTimeout(() => $("#portInput").focus(), 0);
 }
 async function applyPort() {
@@ -1033,6 +1044,53 @@ $("#portInput").addEventListener("keydown", e => { if (e.key === "Enter") applyP
 document.addEventListener("click", () => $("#settingsPop").classList.remove("open"));
 addEventListener("keydown", e => { if (e.key === "Escape") $("#settingsPop").classList.remove("open"); });
 loadInfo();
+
+// ---------- обновления ----------
+let updInfo = null;
+function renderUpdate() {
+  const u = updInfo, n = $("#updNotice"), note = $("#updNote");
+  if (!u) { n.hidden = true; return; }
+  $("#updCheck").checked = !!u.enabled;
+  const fileLink = u.asset ? `<a href="${esc(u.asset)}" target="_blank" rel="noopener">Скачать${u.asset_name ? " " + esc(u.asset_name) : ""}</a>` : "";
+  const pageLink = u.page ? `<a href="${esc(u.page)}" target="_blank" rel="noopener">Что нового</a>` : "";
+  if (u.newer) {
+    note.innerHTML = `Доступна версия <b>${esc(u.latest)}</b> (у вас ${esc(u.current)}). ${fileLink} ${pageLink}`;
+    note.className = "note c-green";
+  } else if (u.error) {
+    note.textContent = u.error; note.className = "note c-red";
+  } else if (u.latest) {
+    note.textContent = `У вас последняя версия — ${u.current}.` + (u.checked_at ? ` Проверено ${fmtTime(u.checked_at * 1000)}.` : "");
+    note.className = "note";
+  } else {
+    note.textContent = u.enabled ? "Ещё не проверялось." : "Проверка выключена.";
+    note.className = "note";
+  }
+  if (u.newer && u.latest !== u.dismissed) {
+    n.innerHTML = `Доступна новая версия Cheburcheck Multi <b>${esc(u.latest)}</b> (у вас ${esc(u.current)}). ${fileLink}${pageLink}<a id="updHide">Скрыть</a>`;
+    n.hidden = false;
+    $("#updHide").onclick = async () => {
+      n.hidden = true;
+      updInfo.dismissed = u.latest;
+      try { await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ update_dismissed: u.latest }) }); } catch {}
+    };
+  } else n.hidden = true;
+}
+async function loadUpdate(force) {
+  try { updInfo = await (await fetch("/api/update" + (force ? "?force=1" : ""), { cache: "no-store" })).json(); }
+  catch { updInfo = { current: appInfo?.version || "?", enabled: true, error: "Программа не отвечает" }; }
+  renderUpdate();
+}
+$("#updNow").onclick = async () => {
+  $("#updNow").disabled = true; $("#updNote").textContent = "Проверяю…"; $("#updNote").className = "note";
+  await loadUpdate(true);
+  $("#updNow").disabled = false;
+};
+$("#updCheck").addEventListener("change", async e => {
+  try { await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ update_check: e.target.checked }) }); } catch {}
+  if (updInfo) updInfo.enabled = e.target.checked;
+  if (e.target.checked) loadUpdate(false); else renderUpdate();
+});
+loadUpdate(false);
 
 // ---------- выключение программы ----------
 $("#quitBtn").onclick = async () => {
