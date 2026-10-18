@@ -107,6 +107,7 @@ try { window.applyTheme(localStorage.getItem("cheburcheck-theme") || "auto"); } 
   .tile .cn { color: var(--muted); font-size: 12px; white-space: nowrap; }
   .tile .vd { font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
   .tile .sm { font-size: 11px; color: var(--muted); margin-top: auto; }
+  .tile .part { font-size: 12px; font-weight: bold; }
   .tile.add { border-style: dashed; align-items: center; justify-content: center; color: var(--muted); background: transparent; }
   /* перетаскивание плиток */
   .tile[data-id] { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
@@ -383,8 +384,11 @@ async function load() {
 
 // ---------- логика вердикта (как на сайте, frontend/src/lib/api/probe.ts) ----------
 function probeVerdicts(p, hasCdn) {
-  return (p.verdicts || []).map(v => (hasCdn && !p.cdn_unblocked && (p.host_results?.length ?? 0) !== 0 && v === "ok") ? "cdn_block" : v);
+  return (p.verdicts || []).map(v =>
+    v === "cdn_block" ? (hasCdn ? "cdn_block" : "ok")
+    : (hasCdn && !p.cdn_unblocked && p.host_results?.length !== 0 && v === "ok") ? "cdn_block" : v);   // точно как displayProbeVerdicts на сайте
 }
+const BLOCK_VERDICTS = ["tspu_block", "sni_block", "dns_spoofing", "cdn_block"];
 function primaryVerdict(p, hasCdn) {
   const vs = probeVerdicts(p, hasCdn);
   return PRIORITY.find(v => vs.includes(v)) || null;
@@ -408,12 +412,19 @@ function summarize(srv) {
   const hasCdn = Object.keys(c.cdn_providers || {}).length > 0;
   const agg = aggregate(r.probes || [], hasCdn);
   const total = (r.probes || []).length;
-  const base = { r, c, hasCdn, total, ...agg };
+  // блокировка у части проб: итог по большинству (как на сайте) может быть «Доступен»,
+  // но для VPN важно, что у некоторых операторов он режется — показываем отдельно
+  const partialBlock = BLOCK_VERDICTS.filter(v => agg.counts[v]).sort((a, b) => agg.counts[b] - agg.counts[a]);
+  const partialCount = partialBlock.reduce((n, v) => n + agg.counts[v], 0);
+  const partial = agg.verdict && BLOCK_VERDICTS.includes(agg.verdict) ? null
+    : partialCount ? { count: partialCount, top: partialBlock[0] } : null;
+  const base = { r, c, hasCdn, total, partial, ...agg };
   if (r.status === "probing") return { ...base, kind: "busy", cls: "", text: r.waiting ? "в очереди (лимит сайта)" : "сканирование" };
   if (agg.verdict) return { ...base, kind: "done", cls: VERDICTS[agg.verdict].cls, text: VERDICTS[agg.verdict].text };
   if (c.blocked) return { ...base, kind: "done", cls: "red", text: "В списках блокировок" };
   if (total) return { ...base, kind: "done", cls: "gray", text: "Неясно" };
-  return { ...base, kind: "done", cls: "green", text: "Не найден в списках" };
+  // проб нет (не запускались, недоступны, остановлены) — отсутствие в списках не значит «доступен»
+  return { ...base, kind: "done", cls: "gray", text: "Нет данных проб", sub: r.probeError || "пробы не завершились" };
 }
 function barHtml(counts, total) {
   if (!total) return `<div class="bar"></div>`;
@@ -438,13 +449,14 @@ function renderTiles() {
     let sm = "";
     if (s.kind === "busy" && s.r?.status === "probing") sm = `${s.total}/${s.r.online || "?"} проб · сейчас`;
     else if (s.kind === "done") {
-      const probes = s.total ? `${s.verdict ? (s.counts[s.verdict] || 0) : s.total}/${s.r.online || s.total} проб` : "без проб";
+      const probes = s.total ? `${s.verdict ? (s.counts[s.verdict] || 0) : s.total}/${s.r.online || s.total} проб` : esc(s.sub || "без проб");
       sm = `${probes} · ${relTime(s.r.ts)}${s.c.blocked ? ' · <span class="c-red">в реестре</span>' : ""}`;
     } else if (s.kind === "error") sm = esc(s.sub || "");
     else if (s.kind === "new") sm = esc(extractHost(srv.target));
     return `<button class="tile${s.cls && s.cls !== "gray" ? " t-" + s.cls : ""}${sel}" data-id="${srv.id}">
       <div class="top"><span class="nm">${esc(displayName(srv))}</span><span class="cn">${esc(country)}</span></div>
       <div class="vd ${vdCls}">${spin}${esc(s.text)}</div>
+      ${s.partial ? `<div class="part c-red">⚠ ${esc(VERDICTS[s.partial.top].text)} у ${s.partial.count} из ${s.total} проб</div>` : ""}
       ${s.total || s.kind === "busy" ? barHtml(s.counts || {}, Math.max(s.r?.online || 0, s.total || 0)) : ""}
       <div class="sm">${sm}</div></button>`;
   }).join("") + `<button class="tile add" id="addTile">+ добавить адрес</button>`;
@@ -452,15 +464,17 @@ function renderTiles() {
 }
 
 function renderSummary() {
-  let ok = 0, bad = 0, busy = 0;
+  let ok = 0, bad = 0, busy = 0, part = 0;
   for (const srv of state.servers) {
     const s = summarize(srv);
     if (s.kind === "busy") busy++;
-    else if (s.kind === "done" && s.cls === "green") ok++;
     else if (s.kind === "done" && (s.cls === "red" || s.cls === "amber")) bad++;
+    else if (s.kind === "done" && s.partial) part++;
+    else if (s.kind === "done" && s.cls === "green") ok++;
   }
   const p = [];
   if (ok) p.push(`<span class="badge b-green">доступны: ${ok}</span>`);
+  if (part) p.push(`<span class="badge b-amber">блок у части операторов: ${part}</span>`);
   if (bad) p.push(`<span class="badge b-red">блокируются: ${bad}</span>`);
   if (busy) p.push(`<span class="badge b-gray"><span class="spin"></span> проверяется: ${busy}</span>`);
   $("#summary").innerHTML = p.join("");
@@ -476,7 +490,7 @@ function renderDetail() {
   }
   const options = state.servers.map(s => {
     const sum = summarize(s);
-    const mark = sum.kind === "done" ? ` · ${sum.text}` : sum.kind === "busy" ? " · …" : "";
+    const mark = sum.kind === "done" ? ` · ${sum.text}${sum.partial ? " ⚠" : ""}` : sum.kind === "busy" ? " · …" : "";
     return `<option value="${s.id}"${s.id === srv.id ? " selected" : ""}>${esc(displayName(s))}${esc(mark)}</option>`;
   }).join("") + `<option value="__new">+ новый адрес</option>`;
   box.innerHTML = `
@@ -519,7 +533,7 @@ function updateSelectLabels() {
   for (const opt of sel.options) {
     const s = srvById(opt.value); if (!s) continue;
     const sum = summarize(s);
-    opt.textContent = displayName(s) + (sum.kind === "done" ? ` · ${sum.text}` : sum.kind === "busy" ? " · …" : "");
+    opt.textContent = displayName(s) + (sum.kind === "done" ? ` · ${sum.text}${sum.partial ? " ⚠" : ""}` : sum.kind === "busy" ? " · …" : "");
   }
 }
 
@@ -542,7 +556,9 @@ function renderDetailBody() {
   if (s.verdict) { const V = VERDICTS[s.verdict]; head = `<span class="headline c-${V.cls}">${V.title}</span><span class="muted">${esc(V.sub)}</span>`; }
   else if (r.status === "probing") head = `<span class="headline c-gray">${r.waiting ? "Ожидание очереди…" : "Сканирование…"}</span>`;
   else if (c.blocked) head = `<span class="headline c-red">В списках блокировок</span>`;
-  else head = `<span class="headline c-green">Не найден в списках</span>`;
+  else if (s.total) head = `<span class="headline c-gray">Неясно</span>`;
+  else head = `<span class="headline c-gray">Нет данных проб</span><span class="muted">в списках не найден, но проверить блокировку у провайдеров не удалось</span>`;
+  if (s.partial) head += `<span class="c-red" style="font-weight:bold">⚠ ${esc(VERDICTS[s.partial.top].text)} у ${s.partial.count} из ${s.total} проб — у части операторов не работает</span>`;
 
   const badges = [];
   badges.push(c.blocked
