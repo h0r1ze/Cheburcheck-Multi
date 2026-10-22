@@ -209,7 +209,7 @@ try { window.applyTheme(localStorage.getItem("cheburcheck-theme") || "auto"); } 
         <div class="note" id="portNote"></div>
         <hr>
         <label>Обновления</label>
-        <span class="chk"><input type="checkbox" id="updCheck"> <span>проверять новые версии раз в сутки</span></span>
+        <span class="chk"><input type="checkbox" id="updCheck"> <span>проверять новые версии при запуске и каждые 6 часов</span></span>
         <div class="row"><button id="updNow">Проверить сейчас</button></div>
         <div class="note" id="updNote"></div>
       </div>
@@ -1091,6 +1091,7 @@ $("#updCheck").addEventListener("change", async e => {
   if (e.target.checked) loadUpdate(false); else renderUpdate();
 });
 loadUpdate(false);
+setInterval(() => loadUpdate(false), 60 * 60 * 1000);   // сервер сам ходит в GitHub не чаще раза в 6 часов
 
 // ---------- выключение программы ----------
 $("#quitBtn").onclick = async () => {

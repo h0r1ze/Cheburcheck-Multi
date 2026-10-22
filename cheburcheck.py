@@ -32,9 +32,9 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 APP_ID = "cheburcheck-multi"
-VERSION = "1.6.1"
+VERSION = "1.6.2"
 REPO = "h0r1ze/Cheburcheck-Multi"
-UPDATE_INTERVAL = 24 * 60 * 60   # проверять обновления не чаще раза в сутки
+UPDATE_INTERVAL = 6 * 60 * 60    # пока программа открыта — проверять обновления раз в 6 часов
 BASE = "https://cheburcheck.ru"
 UA = "Mozilla/5.0 (cheburcheck-multi; +https://cheburcheck.ru)"
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -106,17 +106,20 @@ def release_asset_name():
 
 
 update_lock = threading.Lock()
+update_checked_this_run = False  # при каждом запуске — свежая проверка, не из кеша
 
 
 def check_update(force=False):
-    """Последний релиз на GitHub против своей версии. Результат кешируется в settings.json,
-    без force запрос к GitHub — не чаще раза в сутки (лимит API без авторизации — 60/час)."""
+    """Последний релиз на GitHub против своей версии. Свежий запрос — при первом обращении
+    после запуска и затем раз в 6 часов; результат кешируется в settings.json
+    (лимит GitHub API без авторизации — 60 запросов в час)."""
+    global update_checked_this_run
     settings = load_settings()
     enabled = settings.get("update_check", True)
     result = {"current": VERSION, "enabled": enabled, "dismissed": settings.get("update_dismissed")}
     with update_lock:
         cache = settings.get("update_cache") or {}
-        fresh = time.time() - cache.get("checked_at", 0) < UPDATE_INTERVAL
+        fresh = update_checked_this_run and time.time() - cache.get("checked_at", 0) < UPDATE_INTERVAL
         if (enabled or force) and (force or not fresh):
             req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/releases/latest",
                                          headers={"Accept": "application/vnd.github+json", "User-Agent": UA})
@@ -129,6 +132,7 @@ def check_update(force=False):
                          "asset": asset or rel.get("html_url"), "asset_name": name if asset else None,
                          "checked_at": time.time()}
                 save_settings(update_cache=cache)
+                update_checked_this_run = True
             except (urllib.error.URLError, socket.timeout, OSError, ValueError, KeyError) as e:
                 result["error"] = f"Не удалось проверить обновления: {getattr(e, 'reason', e)}"
     if cache.get("latest"):
