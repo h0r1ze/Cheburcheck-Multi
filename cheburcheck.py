@@ -32,7 +32,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 APP_ID = "cheburcheck-multi"
-VERSION = "1.6.0"
+VERSION = "1.6.1"
 REPO = "h0r1ze/Cheburcheck-Multi"
 UPDATE_INTERVAL = 24 * 60 * 60   # проверять обновления не чаще раза в сутки
 BASE = "https://cheburcheck.ru"
@@ -164,7 +164,8 @@ def ssl_context():
 
 
 SSL_CTX = ssl_context()
-JOB_RE = re.compile(r"^[0-9a-fA-F-]{8,64}$")
+# id проверки: раньше UUID, с 21.10.2026 — подписанный токен (JWT: base64url-части через точку)
+JOB_RE = re.compile(r"^[A-Za-z0-9._-]{8,4096}$")
 MAX_STATE = 20 * 1024 * 1024
 
 CHECK_RETRIES = 5
@@ -363,7 +364,7 @@ class Handler(BaseHTTPRequestHandler):
         """Открывает SSE-поток проб на сайте. Сайт пускает 5 запусков проб в минуту с одного IP,
         поэтому при 429 ждём и повторяем; запуски идут по очереди (probe_lock), чтобы строки
         не толкались. Возвращает ответ или None, если поток не открыт (событие уже отправлено)."""
-        req = urllib.request.Request(f"{BASE}/api/v1/probe/{job}",
+        req = urllib.request.Request(f"{BASE}/api/v1/probe/{urllib.parse.quote(job, safe='')}",
                                      headers={"Accept": "text/event-stream", "User-Agent": UA})
         waited = 0
         with probe_lock:
