@@ -66,7 +66,8 @@ jobs:
               && echo "HTTPS до cheburcheck.ru работает" \
               || echo "::warning::HTTPS-запрос к cheburcheck.ru из сборки ${{ matrix.name }} не прошёл"
             # пробы: поток должен стартовать (ловит смену формата API сайта, как с JWT-id 21.10.2026)
-            ID=$(python -c "import json;print(json.load(open('check.json'))['id'])" 2>/dev/null || true)
+            ID=$(python -c "import json;print(json.load(open('check.json', encoding='utf-8'))['id'])" 2>/dev/null || true)
+            [ -n "$ID" ] || echo "::warning::Сборка ${{ matrix.name }}: не удалось получить id проверки для теста проб"
             if [ -n "$ID" ]; then
               curl -s -N -m 20 -o sse.txt "http://127.0.0.1:18765/api/probe/$ID" || true
               grep -q '^event:\s*started' sse.txt && echo "Поток проб запускается" \
